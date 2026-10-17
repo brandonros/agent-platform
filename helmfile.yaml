@@ -68,7 +68,18 @@ releases:
     chart: bjw-s-labs/app-template
     version: 5.1.0
     values:
-      - values/temporal-draft-review-worker.yaml.gotmpl
+      - values/temporal-workers.yaml.gotmpl
+    needs:
+      - chat/temporal-dev-server
+      - chat/open-webui
+    disableValidationOnInstall: true
+
+  - name: temporal-meeting-notes-worker
+    namespace: chat
+    chart: bjw-s-labs/app-template
+    version: 5.1.0
+    values:
+      - values/temporal-workers.yaml.gotmpl
     needs:
       - chat/temporal-dev-server
       - chat/open-webui

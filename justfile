@@ -135,3 +135,13 @@ capabilities:
     kubectl -n chat exec deploy/temporal-dev-server -- temporal workflow start \
       --type AgentCapabilities --task-queue draft-review-webui --workflow-id "$id"
     echo "Inspect with: just show $id"
+
+# Extract meeting outcomes and route missing details to clarification.
+meeting notes:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    id="meeting-$(date +%Y%m%d-%H%M%S)"
+    input="$(python3 -c 'import json,sys; print(json.dumps({"notes": sys.argv[1]}))' "$1")"
+    kubectl -n chat exec deploy/temporal-dev-server -- temporal workflow start \
+      --type MeetingNotes --task-queue meeting-notes --workflow-id "$id" --input "$input"
+    echo "Inspect with: just show $id"

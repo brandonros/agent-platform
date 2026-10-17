@@ -18,11 +18,11 @@ App-specific values filenames match their source directories:
 | `apps/claude-runtime-server/` | `values/claude-runtime-server.yaml.gotmpl` | API Deployment: `claude-runtime-server` |
 | `apps/claude-runtime-runner/` | Runner image selected in server values | One Kubernetes Job per turn; no standing Deployment |
 | `apps/open-webui-pipe-extension/` | Installed through WebUI's admin API | Runs inside `open-webui` |
-| `apps/temporal-draft-review-worker/` | `values/temporal-draft-review-worker.yaml.gotmpl` | `temporal-draft-review-worker` |
+| `apps/temporal-workers/` | `values/temporal-workers.yaml.gotmpl` | `temporal-draft-review-worker`, `temporal-meeting-notes-worker` |
 | `apps/mcp-test-server/` | `values/mcp-test-server.yaml.gotmpl` | `mcp-test-server` |
 
 `values/open-webui.yaml`, `values/temporal-dev-server.yaml`, and `values/traefik.yaml` deploy
-upstream infrastructure. App releases, Services, and runtime storage use the same names as their source directories.
+upstream infrastructure. The Temporal source directory is shared by two independently deployed workers.
 
 The server accepts runs, stores results/events, and creates Jobs through `jobs.py`.
 The runner executes one Agent SDK turn, writes its result, and exits. Their images
@@ -175,17 +175,7 @@ The writer profile explicitly enables the MCP echo server. No direct runtime API
 credentials are given to this workflow. Its three turns all go through WebUI.
 This replaces the standalone SDK smoke script and incurs model usage.
 
-Local tests retain coverage for retries, ownership/isolation, session branching,
-structured output, workflow decisions, and WebUI event formatting. Run the
-worker suite separately from the API/extension tests:
-
-```bash
-python -m pytest apps/claude-runtime-server/test_server.py apps/open-webui-pipe-extension/test_pipe.py
-python -m pytest apps/temporal-draft-review-worker/test_worker.py
-```
-
-Use both server and runner requirements plus `pytest`, `temporalio==1.34.0`, and `httpx` in a
-local environment. Live acceptance on 2026-10-17 verified worker interruption
+Live acceptance on 2026-10-17 verified worker interruption
 and recovery on activity attempt 2 without duplicate runs/messages, one-session
 context across all workflow steps, and structured critique routing to revision.
 HTTP checks verified separate tool/result/answer items and completion status.
@@ -218,3 +208,40 @@ mounts `job-template.json` into the server. `jobs.py` loads this template and fi
 only `${RUN_ID}` and `${SESSION_ID}` before submitting it. It contains no runner
 image, pod settings, or fallback defaults. Change runner settings in the values
 file and apply Helm; rebuilding the server is unnecessary for those changes.
+
+
+## Shared Temporal workers
+
+Both workers live in `apps/temporal-workers/`. They are separate Kubernetes
+deployments and task queues, using one shared Helm values template:
+
+| Worker / Helm release | Queue | Workflow types |
+| --- | --- | --- |
+| temporal-draft-review-worker | draft-review-webui | DraftReviewWebUI, AgentCapabilities |
+| temporal-meeting-notes-worker | meeting-notes | MeetingNotes |
+
+`framework/webui.py` owns WebUI authentication, saved-chat creation, deterministic
+message IDs, polling/reconnection, heartbeats, and result/tool-event extraction.
+`framework/models.py` defines the shared turn input. `worker.py` is the common launcher,
+selected with WORKER_KIND. There is no separate framework package to publish.
+
+`workflows/draft_review.py` owns proposal prompts, revision limits,
+and the human approval signal, alongside its critique prompt, schema, and verdict validation. `workflows/meeting_notes.py` owns its extraction schema and
+code-based routing: missing owners/deadlines produce clarification questions;
+complete actions produce a follow-up summary. Both turns reuse one saved chat.
+`workflows/capabilities.py` retains the skill/MCP acceptance workflow on the draft queue.
+
+Run `just meeting "We decided to ship Monday. Sam will write release notes by Friday."`
+and inspect the returned workflow ID with `just show ID`. Missing details can
+be demonstrated with `just meeting "We decided to ship Monday. Write release notes."`.
+The clarification route completes with needs_clarification; it does not yet wait
+for a human signal. The proposal workflow retains its human review gate.
+
+Both deployments currently use the configured WebUI service account. Shared
+source does not imply shared workflow sessions: each execution creates its own
+chat. Scaling/restarting either worker does not require scaling the other.
+
+
+Live split verification (2026-10-17): both meeting routes completed through WebUI,
+the existing AgentCapabilities run passed skill/MCP/value checks, and historical
+DraftReviewWebUI and AgentCapabilities executions replayed successfully.
