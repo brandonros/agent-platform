@@ -22,7 +22,10 @@ def call(method, path, token=None, body=None):
 def main():
     token = call("POST", "/api/v1/auths/signin", body={
         "email": os.environ["OWUI_EMAIL"], "password": os.environ["OWUI_PASSWORD"]})["token"]
-    import json
+    install(token)
+
+
+def install(token, user_id=None):
     root = Path(__file__).resolve().parents[1]
     functions = call("GET", "/api/v1/functions/", token)
     models = {"org_claude_code": ("Haiku 5.5", "claude-haiku-5-5"),
@@ -41,6 +44,19 @@ def main():
         call("POST", f"/api/v1/functions/id/{pipe_id}/valves/update", token, valves)
         if not result["is_active"]:
             call("POST", f"/api/v1/functions/id/{pipe_id}/toggle", token)
+        if user_id:
+            from urllib.error import HTTPError
+            try:
+                saved = call("GET", f"/api/v1/models/model?id={pipe_id}", token)
+            except HTTPError as error:
+                if error.code != 404:
+                    raise
+                saved = None
+            grants = (saved or {}).get("access_grants", [])
+            grant = {"principal_type": "user", "principal_id": user_id, "permission": "read"}
+            if not any(all(g.get(k) == v for k, v in grant.items()) for g in grants):
+                call("POST", "/api/v1/models/model/access/update", token,
+                     {"id": pipe_id, "name": body["name"], "access_grants": grants + [grant]})
         print("Installed", body["name"])
     # Preserve historical chats, but remove role entries from the active selector.
     for function in functions:

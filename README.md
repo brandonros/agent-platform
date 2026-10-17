@@ -32,20 +32,44 @@ Temporal orchestrates business workflow steps; the runtime server manages execut
 
 ## Deploy and use
 
-Requires Lima, Helmfile, Helm, just, kubectl, Python 3, and OpenSSL.
+Requires Lima 2+, Helmfile, Helm, just, Python 3, kubectl, and OpenSSL on the host.
+The bootstrap installs Docker inside the lab VM if missing; no host Docker is required.
+
+Copy .env.example to .env and supply your Claude credential and initial WebUI
+administrator email/password. Then:
 
 ```bash
-just init
-just secrets                 # Reads CLAUDE_CODE_OAUTH_TOKEN or prompts
-just build-runtime server job-template-1
-just build-runtime runner agents-1
-just apply
-OWUI_EMAIL=... OWUI_PASSWORD=... just sdk-pipe
+just bootstrap
+export WORKFLOW_API_TOKEN="$(just api-key)"
+python3 examples/workflow-clients/meeting_notes.py "Sam owns release notes, due Friday." --wait
 ```
 
-The WebUI workflow also requires a Kubernetes Secret named `temporal-webui-login`
-with `email` and `password` keys for an existing WebUI account. Its chats belong
-to that account. The deployed lab uses the Test account.
+Bootstrap starts or reuses the Lima VM, preserves existing shared keys, builds
+both runtime images, deploys infrastructure, initializes WebUI only when empty,
+creates a non-admin workflow account on fresh installs, installs the pipe models
+and grants that account read access, then deploys both workers. It uses a temporary
+local port-forward for WebUI setup rather than depending on ingress DNS.
+
+Rerun the same command after changes. It reuses the workflow credentials stored
+in temporal-webui-login and does not reset passwords, delete chats, or replace
+existing model grants. Existing installations that already use an admin workflow
+account retain it; bootstrap does not silently change its role. Keep OWUI_EMAIL
+and OWUI_PASSWORD set to an administrator for reruns. For this older lab only,
+the existing administrator workflow login can serve as a fallback.
+
+Content-derived image tags are recorded in ignored .runtime-images.yaml, which
+the runtime Helm values read on subsequent manual deployments. Explicit
+SERVER_IMAGE_TAG/RUNNER_IMAGE_TAG environment variables override those values.
+Do not delete that file unless you intend to return to the default image tags.
+
+The workflow example prints its execution ID, followed by the result with --wait.
+Closing the client does not cancel execution. Use client.py show ID to resume
+observation. Workflow chats belong to the configured service account, not to the
+person submitting the HTTP request.
+
+If setup stops: fix the reported cause and rerun just bootstrap. It never deletes
+volumes or recreates an existing account with a new password. BOOTSTRAP_WEBUI_PORT
+(default 18080) can be changed if the local port is occupied.
 
 - Chat: http://chat.127.0.0.1.sslip.io
 - Runtime API/docs: http://agent.127.0.0.1.sslip.io/docs
@@ -55,11 +79,11 @@ Ask the chat to use the team-glossary skill to explain Bluebird and ACE.
 Follow-up messages resume the saved Claude session.
 
 ```bash
-just run "A staff writing pilot"        # One saved WebUI conversation
-just show <workflow-id>                 # State, chat ID, critique, latest draft
-just revise <workflow-id> "Shorten it"
-just approve <workflow-id>
-just reject <workflow-id>
+python3 examples/workflow-clients/draft_review.py start "A staff writing pilot"        # One saved WebUI conversation
+python3 examples/workflow-clients/client.py show <workflow-id>                 # State, chat ID, critique, latest draft
+python3 examples/workflow-clients/draft_review.py revise <workflow-id> "Shorten it"
+python3 examples/workflow-clients/draft_review.py approve <workflow-id>
+python3 examples/workflow-clients/draft_review.py reject <workflow-id>
 just status
 just logs
 just stop
@@ -68,7 +92,10 @@ just stop
 Rerun `just sdk-pipe` after editing the extension. `just sdk-apply` updates the
 runtime server; `just apply` reconciles all releases. Both runtime Dockerfiles use
 this repository as build context. `just build-runtime server <tag>` and
-`just build-runtime runner <tag>` build separately inside Lima and import into k3s.
+`just build-runtime runner <tag>` build separately inside Lima and import into k3s, using
+[scripts/build-runtime.sh](scripts/build-runtime.sh). The script stages only the
+selected image’s build inputs, builds and imports the image, and cleans up its
+temporary directories. It does not deploy or update Helm values.
 The lab VM needs Docker (`sudo apt-get install docker.io`) for these recipes.
 For another cluster, build/push the images to its registry and set image references
 in the server values. No dependencies are installed when the server or Jobs start.
@@ -160,8 +187,8 @@ interactive tool approvals are outside the current chat integration.
 The only setup script is `scripts/sync_pipe.py`, which installs the WebUI pipe.
 Agents and skills are packaged in the runner image; no WebUI agent/skill sync is needed.
 
-Run `just capabilities` for the maintained Temporal end-to-end example. Inspect
-its state with `just show <workflow-id>` and open its `chat_id` in WebUI.
+Run `python3 examples/workflow-clients/agent_capabilities.py` for the maintained Temporal end-to-end example. Inspect
+its state with `python3 examples/workflow-clients/client.py show <workflow-id>` and open its `chat_id` in WebUI.
 `AgentCapabilities` runs on the existing worker and queue:
 1. Create one WebUI chat and persist its ID.
 2. Select the native `writer` agent and invoke `team-glossary`.
@@ -231,9 +258,9 @@ code-based routing: missing owners/deadlines produce clarification questions;
 complete actions produce a follow-up summary. Both turns reuse one saved chat.
 `workflows/capabilities.py` retains the skill/MCP acceptance workflow on the draft queue.
 
-Run `just meeting "We decided to ship Monday. Sam will write release notes by Friday."`
-and inspect the returned workflow ID with `just show ID`. Missing details can
-be demonstrated with `just meeting "We decided to ship Monday. Write release notes."`.
+Run `python3 examples/workflow-clients/meeting_notes.py "We decided to ship Monday. Sam will write release notes by Friday."`
+and inspect the returned workflow ID with `python3 examples/workflow-clients/client.py show ID`. Missing details can
+be demonstrated with `python3 examples/workflow-clients/meeting_notes.py "We decided to ship Monday. Write release notes."`.
 The clarification route completes with needs_clarification; it does not yet wait
 for a human signal. The proposal workflow retains its human review gate.
 
@@ -245,3 +272,70 @@ chat. Scaling/restarting either worker does not require scaling the other.
 Live split verification (2026-10-17): both meeting routes completed through WebUI,
 the existing AgentCapabilities run passed skill/MCP/value checks, and historical
 DraftReviewWebUI and AgentCapabilities executions replayed successfully.
+
+## Temporal workflow HTTP API
+
+The `temporal-workflow-api` Deployment exposes
+`http://workflows.127.0.0.1.sslip.io` through Traefik. In the cluster use
+`http://temporal-workflow-api.chat.svc.cluster.local:8000`.
+It needs no PVC; Temporal stores execution history.
+
+All three endpoints require `Authorization: Bearer <token>`. The lab uses the
+existing `chat-secrets/api-key` service credential. An administrator can retrieve
+it with `just api-key`; callers set WORKFLOW_API_TOKEN in their environment or
+local .env. WORKFLOW_API_URL overrides the default lab URL. This is shared
+service authentication, not per-user ownership or organizational SSO.
+
+- POST /workflows accepts {"type":"MeetingNotes","task_queue":"meeting-notes","args":[{"notes":"..."}]}
+  and returns 202 with id and a relative polling URL.
+- GET /workflows/{id} returns execution status, live progress when a worker can
+  answer, and result after completion (or error on failure).
+- POST /workflows/{id}/signals accepts
+  {"name":"submit_review","args":["approve"]}; only draft-review supports this
+  signal. Acceptance means Temporal received it, not that processing finished.
+
+The API has no workflow registry or business input schemas. Callers supply
+the Temporal type, task queue, and positional JSON argument array; workers own
+input validation and signal handling. A 202 start confirms acceptance by
+Temporal, not that a matching worker exists. Unknown types/queues can remain
+unprocessed, and malformed arguments can cause workflow-task failures.
+
+Progress uses the optional status query convention. Workflows without that
+query return null progress; execution status and final results still work.
+Signals accept any name and argument array. An accepted signal need not have
+a registered handler, so callers must know the receiving workflow's contract.
+The API still exposes only executions it created, in its configured namespace.
+
+Supply an Idempotency-Key header on POST /workflows to recover the same execution
+after a lost response. Reusing it with different type, queue, or arguments returns 409.
+This protection lasts while Temporal retains the execution history. Signals
+are not deduplicated by this interface.
+
+Workflow callers live in [examples/workflow-clients](examples/workflow-clients/README.md),
+not the justfile. They use Python's standard library and HTTP, with no Kubernetes
+or Temporal SDK dependency. Export WORKFLOW_API_TOKEN before running them;
+unlike just, the Python examples do not automatically load .env.
+
+
+## Microsoft Entra ID
+
+Open WebUI supports Microsoft Entra ID browser sign-in through OAuth/OIDC.
+See [the official SSO documentation](https://docs.openwebui.com/features/authentication-access/auth/sso/).
+Use a tenant-specific app registration, an HTTPS WebUI URL and matching callback,
+and configure the client ID, client secret, and tenant ID through Kubernetes
+Secrets. Group/role mapping and model access are separate configuration choices.
+
+This lab bootstrap deliberately uses local passwords. Entra is not configured
+by it, and no organization tenant credentials are assumed. Moving browser login
+to Entra does not automatically change either of these paths:
+
+- Temporal workers currently sign in to WebUI with a service-account password.
+  Before disabling local login, replace that path with a supported service
+  credential and define who owns the resulting chats.
+- temporal-workflow-api currently verifies a shared bearer token. Organizational
+  callers need Entra token validation (issuer, audience, expiry, roles/scopes),
+  or a trusted identity gateway, plus authorization. Client-credential access
+  and delegated user access have different ownership/auditing requirements.
+
+Therefore Entra is compatible with the architecture, but browser SSO alone does
+not provide end-to-end user authorization or delegated access to MCP tools.

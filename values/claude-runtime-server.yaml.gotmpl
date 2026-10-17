@@ -1,3 +1,7 @@
+{{- $images := dict "server" "job-template-1" "runner" "agents-1" -}}
+{{- if isFile "../.runtime-images.yaml" -}}
+{{- $images = readFile "../.runtime-images.yaml" | fromYaml -}}
+{{- end }}
 # Separate built server and runner images; build-runtime imports lab images into k3s.
 defaultPodOptions:
   automountServiceAccountToken: true
@@ -16,7 +20,7 @@ controllers:
       app:
         image:
           repository: claude-runtime-server
-          tag: {{ env "SERVER_IMAGE_TAG" | default "job-template-1" | quote }}
+          tag: {{ env "SERVER_IMAGE_TAG" | default $images.server | quote }}
           pullPolicy: IfNotPresent
         command: ["python", "-m", "uvicorn", "server:create_app", "--factory", "--app-dir", "/app", "--host", "0.0.0.0", "--port", "8000"]
         env:
@@ -90,7 +94,7 @@ configMaps:
                 "containers": [
                   {
                     "name": "runner",
-                    "image": {{ printf "claude-runtime-runner:%s" (env "RUNNER_IMAGE_TAG" | default "agents-1") | toJson }},
+                    "image": {{ printf "claude-runtime-runner:%s" (env "RUNNER_IMAGE_TAG" | default $images.runner) | toJson }},
                     "imagePullPolicy": "IfNotPresent",
                     "command": [
                       "python",

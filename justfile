@@ -18,7 +18,11 @@ init:
     #!/usr/bin/env bash
     set -eu
     helmfile init
-    limactl start --tty=false --name=chat lima/k3s.yaml
+    if limactl list --quiet | grep -x chat >/dev/null; then
+      limactl start --tty=false chat
+    else
+      limactl start --tty=false --name=chat lima/k3s.yaml
+    fi
     umask 077
     limactl shell chat sudo cat /etc/rancher/k3s/k3s.yaml > "$KUBECONFIG"
 
@@ -77,39 +81,6 @@ stop:
 api-key:
     @kubectl -n chat get secret chat-secrets -o jsonpath='{.data.api-key}' | base64 -d; echo
 
-# Start the WebUI workflow; prints its ID.
-run topic:
-    #!/usr/bin/env bash
-    set -eu
-    id="draft-$(date +%Y%m%d-%H%M%S)"
-    input="$(python3 -c 'import json,sys; print(json.dumps({"topic": sys.argv[1]}))' "$1")"
-    kubectl -n chat exec deploy/temporal-dev-server -- temporal workflow start \
-      --type DraftReviewWebUI --task-queue draft-review-webui --workflow-id "$id" --input "$input" >/dev/null
-    echo "$id"
-    echo "Watch: http://temporal.127.0.0.1.sslip.io/namespaces/default/workflows/$id"
-
-# State, critiques, and latest version of a workflow.
-show id:
-    @kubectl -n chat exec deploy/temporal-dev-server -- temporal workflow query \
-      --workflow-id "$1" --type status --output json \
-      | python3 -c 'import json,sys; s=json.load(sys.stdin)["queryResult"][0]; has_latest="latest" in s; latest=s.pop("latest", None); print(json.dumps(s, indent=2)); print("\n--- latest version ---\n" + (latest or "(none yet)")) if has_latest else None'
-
-approve id:
-    kubectl -n chat exec deploy/temporal-dev-server -- temporal workflow signal \
-      --workflow-id "$1" --name submit_review --input '"approve"'
-
-# Ask for changes; the workflow revises and waits for review again.
-revise id note:
-    #!/usr/bin/env bash
-    set -eu
-    note="$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$2")"
-    kubectl -n chat exec deploy/temporal-dev-server -- temporal workflow signal \
-      --workflow-id "$1" --name submit_review --input '"revise"' --input "$note"
-
-reject id:
-    kubectl -n chat exec deploy/temporal-dev-server -- temporal workflow signal \
-      --workflow-id "$1" --name submit_review --input '"reject"'
-
 logs app="claude-runtime-server":
     kubectl -n chat logs -f "deployment/$1"
 
@@ -118,30 +89,10 @@ destroy:
     helmfile destroy
 
 
-# Build either runtime image in the Lima VM and import it into k3s. Use a new tag for changes.
+# Build and import a runtime image into the lab VM. Use a new tag for changes.
 build-runtime component tag:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    case "$1" in server|runner) ;; *) echo 'component must be server or runner' >&2; exit 1;; esac
-    [[ "$2" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$ ]] || exit 1
-    COPYFILE_DISABLE=1 tar --no-xattrs --exclude='__pycache__' -czf - "apps/claude-runtime-$1" skills agents | \
-      limactl shell chat sh -c 'set -eu; context=$(mktemp -d); trap '\''rm -rf "$context"'\'' EXIT; tar -xzf - -C "$context"; sudo docker build -t "claude-runtime-$1:$2" -f "$context/apps/claude-runtime-$1/Dockerfile" "$context"; sudo docker save "claude-runtime-$1:$2" | sudo k3s ctr images import -' -- "$1" "$2"
+    @bash scripts/build-runtime.sh "$1" "$2"
 
-# Agent + skill + MCP + structured decision, all through one saved WebUI chat.
-capabilities:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    id="capabilities-$(date +%Y%m%d-%H%M%S)"
-    kubectl -n chat exec deploy/temporal-dev-server -- temporal workflow start \
-      --type AgentCapabilities --task-queue draft-review-webui --workflow-id "$id"
-    echo "Inspect with: just show $id"
-
-# Extract meeting outcomes and route missing details to clarification.
-meeting notes:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    id="meeting-$(date +%Y%m%d-%H%M%S)"
-    input="$(python3 -c 'import json,sys; print(json.dumps({"notes": sys.argv[1]}))' "$1")"
-    kubectl -n chat exec deploy/temporal-dev-server -- temporal workflow start \
-      --type MeetingNotes --task-queue meeting-notes --workflow-id "$id" --input "$input"
-    echo "Inspect with: just show $id"
+# Initialize the lab, build images, configure WebUI, and deploy workers.
+bootstrap:
+    @bash scripts/bootstrap.sh

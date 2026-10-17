@@ -84,3 +84,13 @@ releases:
       - chat/temporal-dev-server
       - chat/open-webui
     disableValidationOnInstall: true
+
+  - name: temporal-workflow-api
+    namespace: chat
+    chart: bjw-s-labs/app-template
+    version: 5.1.0
+    values:
+      - values/temporal-workflow-api.yaml.gotmpl
+    needs:
+      - chat/temporal-dev-server
+    disableValidationOnInstall: true
