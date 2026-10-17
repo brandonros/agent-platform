@@ -1,0 +1,43 @@
+defaultPodOptions:
+  automountServiceAccountToken: false
+  securityContext: {runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000}
+controllers:
+  main:
+    containers:
+      app:
+        image: {repository: python, tag: "3.12-slim"}
+        command: [sh, -c, 'pip install --no-cache-dir --target=/tmp/deps mcp==2.3.0 && PYTHONPATH=/tmp/deps python /app/server.py']
+        env: {HOME: /tmp}
+        resources:
+          requests: {cpu: 25m, memory: 64Mi}
+          limits: {memory: 256Mi}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {drop: [ALL]}
+configMaps:
+  code:
+    data:
+      server.py: |
+{{ readFile "../apps/mcp-test-server/server.py" | indent 8 }}
+persistence:
+  code:
+    type: configMap
+    identifier: code
+    globalMounts: [{path: /app, readOnly: true}]
+service:
+  main:
+    controller: main
+    ports:
+      http: {port: 8000}
+rawResources:
+  network:
+    manifest:
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      spec:
+        podSelector: {matchLabels: {app.kubernetes.io/instance: mcp-test-server}}
+        policyTypes: [Ingress]
+        ingress:
+          - from:
+              - podSelector: {matchLabels: {app: claude-runner}}
+            ports: [{protocol: TCP, port: 8000}]

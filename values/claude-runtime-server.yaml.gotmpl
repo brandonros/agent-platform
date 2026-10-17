@@ -1,0 +1,258 @@
+# Separate built server and runner images; build-runtime imports lab images into k3s.
+defaultPodOptions:
+  automountServiceAccountToken: true
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+controllers:
+  claude-runtime-server:
+    forceRename: claude-runtime-server
+    serviceAccount:
+      identifier: claude-runtime-server
+    strategy: Recreate
+    replicas: 1
+    containers:
+      app:
+        image:
+          repository: claude-runtime-server
+          tag: {{ env "SERVER_IMAGE_TAG" | default "job-template-1" | quote }}
+          pullPolicy: IfNotPresent
+        command: ["python", "-m", "uvicorn", "server:create_app", "--factory", "--app-dir", "/app", "--host", "0.0.0.0", "--port", "8000"]
+        env:
+          PYTHONUNBUFFERED: "1"
+          JOB_TEMPLATE_PATH: /config/job-template.json
+          MAX_ACTIVE_RUNS: "2"
+          HOME: /tmp
+          DATA_DIR: /data
+          AGENT_CONFIG_DIR: /config
+          API_KEY:
+            valueFrom:
+              secretKeyRef:
+                name: chat-secrets
+                key: api-key
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+        probes:
+          readiness:
+            custom: true
+            enabled: true
+            spec:
+              httpGet:
+                path: /health
+                port: 8000
+          liveness:
+            custom: true
+            enabled: true
+            spec:
+              httpGet:
+                path: /health
+                port: 8000
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 1Gi
+configMaps:
+  runner-job:
+    data:
+      job-template.json: |
+        {
+          "apiVersion": "batch/v1",
+          "kind": "Job",
+          "metadata": {
+            "name": "claude-run-${RUN_ID}",
+            "labels": {
+              "app": "claude-runner"
+            }
+          },
+          "spec": {
+            "backoffLimit": 0,
+            "activeDeadlineSeconds": 480,
+            "ttlSecondsAfterFinished": 3600,
+            "template": {
+              "metadata": {
+                "labels": {
+                  "app": "claude-runner"
+                }
+              },
+              "spec": {
+                "automountServiceAccountToken": false,
+                "restartPolicy": "Never",
+                "securityContext": {
+                  "runAsUser": 1000,
+                  "runAsGroup": 1000,
+                  "fsGroup": 1000
+                },
+                "containers": [
+                  {
+                    "name": "runner",
+                    "image": {{ printf "claude-runtime-runner:%s" (env "RUNNER_IMAGE_TAG" | default "agents-1") | toJson }},
+                    "imagePullPolicy": "IfNotPresent",
+                    "command": [
+                      "python",
+                      "/app/runner.py",
+                      "${RUN_ID}"
+                    ],
+                    "volumeMounts": [
+                      {
+                        "name": "data",
+                        "mountPath": "/session",
+                        "subPath": "sessions/${SESSION_ID}"
+                      }
+                    ],
+                    "env": [
+                      {
+                        "name": "HOME",
+                        "value": "/session/home"
+                      },
+                      {
+                        "name": "RUN_TIMEOUT_SECONDS",
+                        "value": "180"
+                      },
+                      {
+                        "name": "CLAUDE_CODE_OAUTH_TOKEN",
+                        "valueFrom": {
+                          "secretKeyRef": {
+                            "name": "chat-secrets",
+                            "key": "oauth-token"
+                          }
+                        }
+                      }
+                    ],
+                    "securityContext": {
+                      "allowPrivilegeEscalation": false,
+                      "capabilities": {
+                        "drop": [
+                          "ALL"
+                        ]
+                      }
+                    },
+                    "resources": {
+                      "requests": {
+                        "cpu": "100m",
+                        "memory": "256Mi"
+                      },
+                      "limits": {
+                        "memory": "768Mi"
+                      }
+                    }
+                  }
+                ],
+                "volumes": [
+                  {
+                    "name": "data",
+                    "persistentVolumeClaim": {
+                      "claimName": "claude-runtime-server"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+  agent-config:
+    data:
+      profiles.json: |
+{{ readFile "../apps/claude-runtime-runner/profiles.json" | indent 8 }}
+persistence:
+  runner-job:
+    type: configMap
+    identifier: runner-job
+    globalMounts:
+      - path: /config/job-template.json
+        subPath: job-template.json
+        readOnly: true
+  data:
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 1Gi
+    globalMounts:
+      - path: /data
+  agent-config:
+    type: configMap
+    identifier: agent-config
+    globalMounts:
+      - path: /config/profiles.json
+        subPath: profiles.json
+        readOnly: true
+service:
+  claude-runtime-server:
+    controller: claude-runtime-server
+    forceRename: claude-runtime-server
+    ports:
+      http:
+        port: 8000
+ingress:
+  claude-runtime-server:
+    className: traefik
+    hosts:
+      - host: agent.127.0.0.1.sslip.io
+        paths:
+          - path: /
+            pathType: Prefix
+            service:
+              identifier: claude-runtime-server
+              port: http
+
+serviceAccount:
+  claude-runtime-server:
+    forceRename: claude-runtime-server
+    enabled: true
+rawResources:
+  job-role:
+    forceRename: claude-runtime-server-job-role
+    manifest:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: Role
+      rules:
+        - apiGroups: [batch]
+          resources: [jobs]
+          verbs: [create, get, delete]
+  job-binding:
+    manifest:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: Role
+        name: claude-runtime-server-job-role
+      subjects:
+        - kind: ServiceAccount
+          name: claude-runtime-server
+          namespace: chat
+  worker-network:
+    manifest:
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      spec:
+        podSelector:
+          matchLabels:
+            app: claude-runner
+        policyTypes: [Ingress, Egress]
+        ingress: []
+        egress:
+          - to:
+              - podSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: mcp-test-server
+            ports: [{protocol: TCP, port: 8000}]
+          - to:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: kube-system
+                podSelector:
+                  matchLabels:
+                    k8s-app: kube-dns
+            ports:
+              - {protocol: UDP, port: 53}
+              - {protocol: TCP, port: 53}
+          - to:
+              - ipBlock:
+                  cidr: 0.0.0.0/0
+                  except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 127.0.0.0/8]
+            ports:
+              - {protocol: TCP, port: 443}

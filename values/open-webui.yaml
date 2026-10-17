@@ -1,0 +1,108 @@
+controllers:
+  open-webui:
+    forceRename: open-webui
+    # One pod owns the ReadWriteOnce data volume.
+    strategy: Recreate
+    initContainers:
+      # The image bakes embedding, Whisper, and tiktoken models into
+      # /app/backend/data/cache; the volume would hide them. Copy without
+      # overwriting so existing chats and settings are kept.
+      copy-app-data:
+        image: &image
+          repository: ghcr.io/open-webui/open-webui
+          # Matches the ../open-webui checkout.
+          tag: "0.12.3"
+        command: ["sh", "-c", "cp -R -n /app/backend/data/* /tmp/app-data/"]
+    containers:
+      app:
+        image: *image
+        env:
+          CLAUDE_SERVICE_API_KEY:
+            valueFrom:
+              secretKeyRef:
+                name: chat-secrets
+                key: api-key
+          WEBUI_URL: http://chat.127.0.0.1.sslip.io
+          # The SDK pipe is the model backend.
+          ENABLE_OLLAMA_API: "False"
+          ENABLE_OPENAI_API: "False"
+          # One replica: the default in-memory websocket manager needs no Redis.
+          ENABLE_WEBSOCKET_SUPPORT: "True"
+          # Without a stable key, a restart signs every user out.
+          WEBUI_SECRET_KEY:
+            valueFrom:
+              secretKeyRef:
+                name: chat-secrets
+                key: webui-secret-key
+          # Keep these values authoritative; otherwise the first boot's settings
+          # are saved in the database and later env changes are ignored.
+          ENABLE_PERSISTENT_CONFIG: "False"
+          # Keep this milestone focused on user turns.
+          ENABLE_TITLE_GENERATION: "False"
+          ENABLE_TAGS_GENERATION: "False"
+          ENABLE_FOLLOW_UP_GENERATION: "False"
+        probes:
+          startup:
+            custom: true
+            enabled: true
+            spec:
+              # First boot migrates the database and loads models.
+              failureThreshold: 60
+              httpGet:
+                path: /health
+                port: 8080
+              periodSeconds: 5
+          liveness:
+            custom: true
+            enabled: true
+            spec:
+              httpGet:
+                path: /health
+                port: 8080
+              periodSeconds: 30
+          readiness:
+            custom: true
+            enabled: true
+            spec:
+              httpGet:
+                path: /ready
+                port: 8080
+              periodSeconds: 15
+        resources:
+          limits:
+            memory: 1536Mi
+          requests:
+            cpu: 100m
+            memory: 512Mi
+    replicas: 1
+persistence:
+  data:
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 5Gi
+    advancedMounts:
+      open-webui:
+        copy-app-data:
+          - path: /tmp/app-data
+        app:
+          - path: /app/backend/data
+service:
+  open-webui:
+    controller: open-webui
+    forceRename: open-webui
+    ports:
+      http:
+        port: 8080
+        targetPort: 8080
+ingress:
+  open-webui:
+    className: traefik
+    forceRename: open-webui
+    hosts:
+      - host: chat.127.0.0.1.sslip.io
+        paths:
+          - path: /
+            pathType: Prefix
+            service:
+              identifier: open-webui
+              port: http

@@ -1,0 +1,56 @@
+controllers:
+  temporal-draft-review-worker:
+    forceRename: temporal-draft-review-worker
+    # app-template's checksum/configMaps annotation rolls the pod on code changes.
+    initContainers:
+      # Stock image, no build: install dependencies into a shared emptyDir.
+      deps:
+        image: &python
+          repository: python
+          tag: "3.12-slim"
+        command:
+          - pip
+          - install
+          - --no-cache-dir
+          - --target=/deps
+          - temporalio==1.34.0
+          - httpx==0.28.1
+    containers:
+      app:
+        image: *python
+        command: ["python", "/app/worker.py"]
+        env:
+          PYTHONPATH: /deps
+          PYTHONUNBUFFERED: "1"
+          TEMPORAL_ADDRESS: temporal-dev-server.chat.svc.cluster.local:7233
+          TEMPORAL_TASK_QUEUE: draft-review-webui
+          MAX_CONCURRENT_ACTIVITIES: "4"
+          WEBUI_URL: http://open-webui.chat.svc.cluster.local:8080
+          WEBUI_EMAIL:
+            valueFrom:
+              secretKeyRef: {name: temporal-webui-login, key: email}
+          WEBUI_PASSWORD:
+            valueFrom:
+              secretKeyRef: {name: temporal-webui-login, key: password}
+        resources:
+          limits:
+            memory: 256Mi
+          requests:
+            cpu: 20m
+            memory: 64Mi
+    replicas: 1
+configMaps:
+  code:
+    data:
+      worker.py: |
+{{ readFile "../apps/temporal-draft-review-worker/worker.py" | indent 8 }}
+persistence:
+  deps:
+    type: emptyDir
+    globalMounts:
+      - path: /deps
+  code:
+    type: configMap
+    identifier: code
+    globalMounts:
+      - path: /app

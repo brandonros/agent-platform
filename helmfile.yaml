@@ -1,0 +1,75 @@
+---
+# Skip diff validation on first install: dependency CRDs don't exist yet.
+
+repositories:
+  - name: traefik
+    url: https://traefik.github.io/charts
+  - name: bjw-s-labs
+    url: ghcr.io/bjw-s-labs/helm
+    oci: true
+
+helmDefaults:
+  wait: true
+  waitForJobs: true
+  timeout: 900
+  createNamespace: true
+  atomic: false
+
+releases:
+  - name: mcp-test-server
+    namespace: chat
+    chart: bjw-s-labs/app-template
+    version: 5.1.0
+    values:
+      - values/mcp-test-server.yaml.gotmpl
+
+  - name: claude-runtime-server
+    namespace: chat
+    chart: bjw-s-labs/app-template
+    version: 5.1.0
+    values:
+      - values/claude-runtime-server.yaml.gotmpl
+    needs:
+      - kube-system/traefik
+    disableValidationOnInstall: true
+
+  # Ingress. Bundled k3s Traefik is disabled in lima/k3s.yaml.
+  - name: traefik
+    namespace: kube-system
+    chart: traefik/traefik
+    version: 41.5.0
+    values:
+      - values/traefik.yaml
+    disableValidationOnInstall: true
+
+  - name: open-webui
+    namespace: chat
+    chart: bjw-s-labs/app-template
+    version: 5.1.0
+    values:
+      - values/open-webui.yaml
+    needs:
+      - chat/claude-runtime-server
+    disableValidationOnInstall: true
+
+  # Workflows: Temporal dev server and a worker that sends turns through Open WebUI.
+  - name: temporal-dev-server
+    namespace: chat
+    chart: bjw-s-labs/app-template
+    version: 5.1.0
+    values:
+      - values/temporal-dev-server.yaml
+    needs:
+      - kube-system/traefik
+    disableValidationOnInstall: true
+
+  - name: temporal-draft-review-worker
+    namespace: chat
+    chart: bjw-s-labs/app-template
+    version: 5.1.0
+    values:
+      - values/temporal-draft-review-worker.yaml.gotmpl
+    needs:
+      - chat/temporal-dev-server
+      - chat/open-webui
+    disableValidationOnInstall: true

@@ -1,0 +1,34 @@
+---
+minimumLimaVersion: 2.0.0
+base: template:_images/ubuntu-lts
+cpus: 4
+# Sized for a 16 GiB host: pod limits below keep the guest from needing more.
+memory: 4GiB
+disk: 60GiB
+mounts: []
+# containerd is managed by k3s, not by Lima.
+containerd:
+  system: false
+  user: false
+provision:
+  - mode: system
+    script: |
+      #!/bin/sh
+      set -eu
+      # Helmfile owns Traefik. Keep k3s ServiceLB and local-path storage.
+      mkdir -p /etc/rancher/k3s
+      cat > /etc/rancher/k3s/config.yaml <<'K3S'
+      disable:
+        - traefik
+      write-kubeconfig-mode: "600"
+      K3S
+      if [ ! -d /var/lib/rancher/k3s ]; then
+        curl -fsSL https://get.k3s.io |
+          INSTALL_K3S_VERSION=v1.36.5+k3s1 sh -s - server
+      fi
+probes:
+  - script: |
+      #!/bin/sh
+      set -eu
+      sudo k3s kubectl wait node --all --for=condition=Ready --timeout=60s
+    hint: See `limactl shell chat sudo journalctl -u k3s`.

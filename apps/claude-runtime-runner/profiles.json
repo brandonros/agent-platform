@@ -1,0 +1,57 @@
+{
+  "general": {
+    "name": "Organizational Claude Code",
+    "prompt": "Assist with organizational tasks using the configured skills and tools.",
+    "thinking": {
+      "type": "adaptive",
+      "display": "summarized"
+    },
+    "mcp_servers": {
+      "lab": {
+        "type": "http",
+        "url": "http://mcp-test-server.chat.svc.cluster.local:8000/mcp"
+      }
+    },
+    "allowed_tools": [
+      "mcp__lab__echo"
+    ]
+  },
+  "writer": {
+    "name": "writer",
+    "native_agent": "writer",
+    "mcp_servers": {
+      "lab": {
+        "type": "http",
+        "url": "http://mcp-test-server.chat.svc.cluster.local:8000/mcp"
+      }
+    },
+    "allowed_tools": [
+      "mcp__lab__echo"
+    ]
+  },
+  "reviewer": {
+    "name": "reviewer",
+    "native_agent": "reviewer"
+  },
+  "integration-test": {
+    "name": "Integration test",
+    "prompt": "Use the configured tools when requested. Report actual results, never invent tool execution.",
+    "mcp_servers": {
+      "lab": {
+        "type": "http",
+        "url": "http://mcp-test-server.chat.svc.cluster.local:8000/mcp"
+      }
+    },
+    "allowed_tools": [
+      "mcp__lab__echo"
+    ],
+    "thinking": {
+      "type": "adaptive",
+      "display": "summarized"
+    }
+  },
+  "draft-reviewer": {
+    "name": "draft-reviewer",
+    "native_agent": "reviewer"
+  }
+}

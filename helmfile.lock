@@ -1,0 +1,10 @@
+version: v1.7.3
+dependencies:
+  - name: app-template
+    repository: oci://ghcr.io/bjw-s-labs/helm
+    version: 5.1.0
+  - name: traefik
+    repository: https://traefik.github.io/charts
+    version: 41.5.0
+digest: sha256:7953730103e3eb6ba4a8ed460e190827c700b3d20488d3b0b49c872f7f5d8599
+generated: "2026-10-17T10:00:46.255637-04:00"

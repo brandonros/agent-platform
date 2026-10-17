@@ -1,0 +1,27 @@
+---
+# k3s ServiceLB exposes ports 80/443; Lima forwards them to the host.
+service:
+  spec:
+    type: LoadBalancer
+
+ingressClass:
+  enabled: true
+  name: traefik
+  isDefaultClass: true
+
+providers:
+  kubernetesIngress:
+    ingressClass: traefik
+
+log:
+  format: json
+accessLog:
+  enabled: true
+  format: json
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
