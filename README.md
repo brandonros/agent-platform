@@ -87,13 +87,14 @@ sessions in the browser.
 - `--turn-id` names the Job after that ID. Dispatching the same turn again
   reuses the existing Job instead of running the prompt twice.
 - Limits per Job: 1 hour, 1 GiB memory, no retries.
-- Don't run two turns of one session at once, or type into a session while a
-  Job is running it; nothing serializes them.
+- One turn per session at a time: the script refuses while a Job for that
+  session is running, and holds a `claude-session-<id>` Lease so two dispatches
+  can't race. Nothing stops a person typing into a session while a Job runs it.
 
 Anything that can create a Job can trigger work: the script, a CronJob, CI, or a
-workflow engine. The volume is ReadWriteOnce, which works because the lab has
-one node; with several nodes, Jobs must run on code-server's node or the volume
-must be ReadWriteMany.
+workflow engine. Other dispatchers should take the same Lease to get the same
+guarantee. The volume is ReadWriteOnce, so the Job template requires the node
+that runs code-server; Jobs stay Pending while code-server is down.
 
 ## Org configuration
 

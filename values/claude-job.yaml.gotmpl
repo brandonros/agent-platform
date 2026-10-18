@@ -20,6 +20,10 @@ configMaps:
                 "restartPolicy": "Never",
                 "automountServiceAccountToken": false,
                 "securityContext": {"runAsUser": 1000, "runAsGroup": 1000, "fsGroup": 1000},
+                "affinity": {"podAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": [{
+                  "labelSelector": {"matchLabels": {"app.kubernetes.io/instance": "code-server", "app.kubernetes.io/controller": "main"}},
+                  "topologyKey": "kubernetes.io/hostname"
+                }]}},
                 "containers": [{
                   "name": "claude",
                   "image": {{ $image | toJson }},

@@ -95,19 +95,41 @@ Entra redirect URI.
    `claude-session`/`claude-started-by` labels:
    - The name is `claude-` + sha256 of `--turn-id`, or of a random UUID.
    - The session is a new UUID unless `--session` is given.
-3. `kubectl create` runs. If the Job already exists, the error is treated as
-   success. This makes a `--turn-id` dispatch idempotent.
-4. The pod mounts the same PVC subpaths as code-server. It runs
+3. If a Job with that name already exists, the script reports it and stops.
+   This makes a `--turn-id` dispatch idempotent.
+4. It takes the session lock (below), creates the Job, and makes the Job the
+   owner of the lock's Lease.
+5. The scheduler puts the pod on code-server's node (required pod affinity),
+   because the RWO volume is attached there. The pod mounts the same PVC subpaths as code-server. It runs
    `claude -p ... --permission-mode bypassPermissions` and passes `--resume` if
    the session file exists, or `--session-id` if it doesn't.
-5. `CLAUDE_CODE_ENTRYPOINT=claude-vscode` makes the extension's Session Manager
+6. `CLAUDE_CODE_ENTRYPOINT=claude-vscode` makes the extension's Session Manager
    list the session.
-6. The result is the last line of the pod log (JSON). `--wait` polls the Job
+7. The result is the last line of the pod log (JSON). `--wait` follows the log
    and prints it.
 
 Any client that can create a Job from the template can dispatch turns, for
 example a CronJob, CI, or a workflow engine. The Python script is only a
-convenience.
+convenience, but other clients need the same lock to keep its guarantee.
+
+### Session lock
+
+One turn per session at a time, enforced by the dispatcher in two layers:
+
+- **Guard.** It refuses if any Job labelled `claude-session=<id>` has no
+  `Complete` or `Failed` condition yet. This also catches Jobs started by
+  dispatchers that don't take the Lease.
+- **Lease.** It creates the Lease `claude-session-<id>`. Creating it is atomic,
+  so of two concurrent dispatchers only one succeeds. An existing Lease is taken
+  over only when no Job for the session is running and either the Lease's Job
+  has finished, or the Job never appeared within 60 s (a dispatcher died
+  mid-start). The takeover is a `replace` with
+  the read `resourceVersion`, so it also fails for all but one dispatcher.
+
+The Job owns the Lease, so garbage collection deletes the Lease along with the
+Job (24 h after it finishes). Jobs need no Kubernetes API access for any of
+this. The lock doesn't cover a person typing in the same session in the
+browser.
 
 ### Image build and release
 
@@ -177,8 +199,8 @@ This is a **single-tenant lab**, not a multi-user platform.
 
 | Constraint | Why | What changes it |
 |---|---|---|
-| One node | The PVC is RWO, so Jobs only start where code-server's volume is attached | RWX storage, or node affinity to code-server's node |
-| No per-session lock | Nothing stops two Jobs (or a Job and a person) from writing to the same session file | A dispatcher-side lock or queue per session |
+| One node's capacity | The PVC is RWO, so Jobs require code-server's node (pod affinity) and stay Pending while code-server is down | Per-Job clones of the repo instead of the shared working tree |
+| One turn per session | The dispatcher's [session lock](#session-lock); nothing covers a person typing in the same session | Only dispatchers that take the Lease are serialized against races |
 | One workspace | Single code-server Deployment and PVC | Per-user workspaces (e.g. Coder) and per-user tokens |
 | Version skew | The extension bundles its own Claude Code; Jobs use the CLI in `claude-base` | Accept it (session format is shared), or pin both |
 | 4 GiB VM | Sized for a 16 GiB Mac; Job limit 1 GiB, code-server limit 2 GiB | Fewer concurrent Jobs, or a larger VM in `lima/k3s.yaml` |
