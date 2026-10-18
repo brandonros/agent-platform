@@ -9,6 +9,11 @@ def echo(nonce: str) -> dict:
     """Return a caller's nonce to prove a real round trip to the cluster MCP server."""
     return {'nonce': nonce, 'source': 'cluster-mcp-test-server'}
 
+@server.prompt()
+def echo_test(nonce: str = 'hello') -> str:
+    """Round-trip check: call the echo tool with a nonce and report the result."""
+    return f'Call the echo tool with nonce "{nonce}" and report exactly what it returned.'
+
 if __name__ == '__main__':
     server.run('streamable-http', host='0.0.0.0', port=8000, stateless_http=True,
                transport_security=TransportSecuritySettings(allowed_hosts=['mcp-test-server:8000', 'mcp-test-server.chat.svc.cluster.local:8000', 'localhost:8000']))

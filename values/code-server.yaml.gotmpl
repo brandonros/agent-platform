@@ -1,0 +1,29 @@
+{{- $tags := readFile "../image-tags.yaml" | fromYaml -}}
+{{- $tag := env "CODE_SERVER_IMAGE_TAG" | default (index $tags "code-server") -}}
+defaultPodOptions:
+  securityContext: {runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000}
+controllers:
+  main:
+    containers:
+      app:
+        image: {repository: code-server, tag: {{ $tag | quote }}, pullPolicy: IfNotPresent}
+        # No password: sign-in is oauth2-proxy (Entra ID) in front; no ingress.
+        args: ["--bind-addr", "0.0.0.0:8080", "--auth", "none", "/home/coder/workspace"]
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: {valueFrom: {secretKeyRef: {name: chat-secrets, key: oauth-token}}}
+        resources: {requests: {cpu: 250m, memory: 512Mi}, limits: {memory: 2Gi}}
+persistence:
+  # Mount only workspace and ~/.claude so the CLI and extension installed in the
+  # image under /home/coder stay visible.
+  home:
+    type: persistentVolumeClaim
+    accessMode: ReadWriteOnce
+    size: 10Gi
+    globalMounts:
+      - {path: /home/coder/workspace, subPath: workspace}
+      - {path: /home/coder/.claude, subPath: claude}
+service:
+  main:
+    controller: main
+    ports:
+      http: {port: 8080}

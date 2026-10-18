@@ -1,0 +1,5 @@
+{
+  "name": "org",
+  "owner": {"name": "Organization"},
+  "plugins": [{"name": "org", "source": "./plugins/org", "description": "Organizational agents, skills, and MCP servers"}]
+}

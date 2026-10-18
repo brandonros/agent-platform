@@ -1,6 +1,3 @@
 .kubeconfig
 .env
 __pycache__
-.pytest_cache/
-
-.runtime-images.yaml

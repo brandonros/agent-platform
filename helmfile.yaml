@@ -16,23 +16,6 @@ helmDefaults:
   atomic: false
 
 releases:
-  - name: mcp-test-server
-    namespace: chat
-    chart: bjw-s-labs/app-template
-    version: 5.1.0
-    values:
-      - values/mcp-test-server.yaml.gotmpl
-
-  - name: claude-runtime-server
-    namespace: chat
-    chart: bjw-s-labs/app-template
-    version: 5.1.0
-    values:
-      - values/claude-runtime-server.yaml.gotmpl
-    needs:
-      - kube-system/traefik
-    disableValidationOnInstall: true
-
   # Ingress. Bundled k3s Traefik is disabled in lima/k3s.yaml.
   - name: traefik
     namespace: kube-system
@@ -42,55 +25,39 @@ releases:
       - values/traefik.yaml
     disableValidationOnInstall: true
 
-  - name: open-webui
+  - name: code-server
     namespace: chat
     chart: bjw-s-labs/app-template
     version: 5.1.0
     values:
-      - values/open-webui.yaml
-    needs:
-      - chat/claude-runtime-server
-    disableValidationOnInstall: true
-
-  # Workflows: Temporal dev server and a worker that sends turns through Open WebUI.
-  - name: temporal-dev-server
-    namespace: chat
-    chart: bjw-s-labs/app-template
-    version: 5.1.0
-    values:
-      - values/temporal-dev-server.yaml
+      - values/code-server.yaml.gotmpl
     needs:
       - kube-system/traefik
     disableValidationOnInstall: true
 
-  - name: temporal-draft-review-worker
+  # Entra ID sign-in in front of code-server.
+  - name: oauth2-proxy
     namespace: chat
     chart: bjw-s-labs/app-template
     version: 5.1.0
     values:
-      - values/temporal-workers.yaml.gotmpl
+      - values/oauth2-proxy.yaml.gotmpl
     needs:
-      - chat/temporal-dev-server
-      - chat/open-webui
-    disableValidationOnInstall: true
+      - chat/code-server
 
-  - name: temporal-meeting-notes-worker
+  # Job template for Claude Code turns; Jobs share code-server's workspace volume.
+  - name: claude-job
     namespace: chat
     chart: bjw-s-labs/app-template
     version: 5.1.0
     values:
-      - values/temporal-workers.yaml.gotmpl
+      - values/claude-job.yaml.gotmpl
     needs:
-      - chat/temporal-dev-server
-      - chat/open-webui
-    disableValidationOnInstall: true
+      - chat/code-server
 
-  - name: temporal-workflow-api
+  - name: mcp-test-server
     namespace: chat
     chart: bjw-s-labs/app-template
     version: 5.1.0
     values:
-      - values/temporal-workflow-api.yaml.gotmpl
-    needs:
-      - chat/temporal-dev-server
-    disableValidationOnInstall: true
+      - values/mcp-test-server.yaml.gotmpl

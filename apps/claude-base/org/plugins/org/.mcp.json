@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "lab": {"type": "http", "url": "http://mcp-test-server.chat.svc.cluster.local:8000/mcp"}
+  }
+}

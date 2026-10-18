@@ -5,14 +5,6 @@ export KUBECONFIG := justfile_directory() / ".kubeconfig"
 default:
     @just --list
 
-# Deploy only the official SDK service; does not change the existing UI/workflows.
-sdk-apply:
-    helmfile -l name=claude-runtime-server sync
-
-# Install/update the WebUI extension (OWUI_EMAIL and OWUI_PASSWORD required).
-sdk-pipe:
-    python3 scripts/sync_pipe.py
-
 # Create/start the VM and write its kubeconfig.
 init:
     #!/usr/bin/env bash
@@ -26,7 +18,8 @@ init:
     umask 077
     limactl shell chat sudo cat /etc/rancher/k3s/k3s.yaml > "$KUBECONFIG"
 
-# Store the Claude token; keeps existing generated keys. Reads CLAUDE_CODE_OAUTH_TOKEN (env or .env), else prompts.
+# Store the Claude token and Entra ID app credentials; keeps the generated cookie secret.
+# Reads CLAUDE_CODE_OAUTH_TOKEN and ENTRA_TENANT_ID/ENTRA_CLIENT_ID/ENTRA_CLIENT_SECRET (env or .env).
 secrets:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -39,20 +32,21 @@ secrets:
     kubectl create namespace chat --dry-run=client -o yaml | kubectl apply -f -
     # Empty when the Secret or key doesn't exist yet (first run).
     existing() {
-      { kubectl -n chat get secret chat-secrets -o "jsonpath={.data.$1}" 2>/dev/null || true; } | base64 -d
+      { kubectl -n chat get secret "$1" -o "jsonpath={.data.$2}" 2>/dev/null || true; } | base64 -d
     }
-    api_key="$(existing api-key)"
-    webui_key="$(existing webui-secret-key)"
     # Values go through files, not argv, so they stay out of the process list.
     kubectl -n chat create secret generic chat-secrets \
       --from-file=oauth-token=<(printf %s "$token") \
-      --from-file=api-key=<(printf %s "${api_key:-$(openssl rand -hex 32)}") \
-      --from-file=webui-secret-key=<(printf %s "${webui_key:-$(openssl rand -hex 32)}") \
       --dry-run=client -o yaml | kubectl apply --server-side --force-conflicts -f -
-    # Env from Secrets is read at start; restart so a new token takes effect.
-    if kubectl -n chat get deployment claude-runtime-server >/dev/null 2>&1; then
-      kubectl -n chat rollout restart deployment/claude-runtime-server
-    fi
+    : "${ENTRA_TENANT_ID:?Set ENTRA_TENANT_ID in .env}" "${ENTRA_CLIENT_ID:?Set ENTRA_CLIENT_ID in .env}" "${ENTRA_CLIENT_SECRET:?Set ENTRA_CLIENT_SECRET in .env}"
+    cookie="$(existing oauth2-proxy cookie-secret)"
+    kubectl -n chat create secret generic oauth2-proxy \
+      --from-file=tenant-id=<(printf %s "$ENTRA_TENANT_ID") \
+      --from-file=client-id=<(printf %s "$ENTRA_CLIENT_ID") \
+      --from-file=client-secret=<(printf %s "$ENTRA_CLIENT_SECRET") \
+      --from-file=cookie-secret=<(printf %s "${cookie:-$(openssl rand -base64 32 | tr -- '+/' '-_')}") \
+      --dry-run=client -o yaml | kubectl apply --server-side --force-conflicts -f -
+    kubectl -n chat rollout restart deployment/oauth2-proxy 2>/dev/null || true
 
 # Install Traefik, then deploy the apps.
 apply:
@@ -77,22 +71,29 @@ top:
 stop:
     limactl stop chat
 
-# Print the lab service bearer key.
-api-key:
-    @kubectl -n chat get secret chat-secrets -o jsonpath='{.data.api-key}' | base64 -d; echo
+# Run a Claude Code turn as a Job in the code-server workspace. Extra args: --session UUID, --turn-id ID, --started-by WHO, --wait.
+claude-job prompt *args:
+    @python3 scripts/claude-job.py "$@"
 
-logs app="claude-runtime-server":
+# List Claude Code Jobs with their sessions and who started them.
+claude-jobs:
+    kubectl -n chat get jobs -l app=claude-job -L claude-session -L claude-started-by
+
+# Open code-server through Entra ID sign-in at http://localhost:8080 (localhost is a secure context).
+code-server:
+    while true; do kubectl -n chat port-forward svc/oauth2-proxy 8080:4180; sleep 1; done
+
+logs app="code-server":
     kubectl -n chat logs -f "deployment/$1"
 
 # Remove Helm releases; volumes and the Secret remain.
 destroy:
     helmfile destroy
 
+# Build and import an image into the lab VM. Use a new tag for changes.
+build-image component tag:
+    @bash scripts/build-image.sh "$1" "$2"
 
-# Build and import a runtime image into the lab VM. Use a new tag for changes.
-build-runtime component tag:
-    @bash scripts/build-runtime.sh "$1" "$2"
-
-# Initialize the lab, build images, configure WebUI, and deploy workers.
+# Initialize the lab, build the code-server image, and deploy everything.
 bootstrap:
     @bash scripts/bootstrap.sh

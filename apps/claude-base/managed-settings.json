@@ -1,0 +1,6 @@
+{
+  "extraKnownMarketplaces": {
+    "org": {"source": {"source": "directory", "path": "/opt/claude-org"}}
+  },
+  "enabledPlugins": {"org@org": true}
+}
