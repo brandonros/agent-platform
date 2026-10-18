@@ -26,7 +26,7 @@ releases:
     disableValidationOnInstall: true
 
   - name: code-server
-    namespace: chat
+    namespace: agent-platform
     chart: bjw-s-labs/app-template
     version: 5.1.0
     values:
@@ -37,26 +37,26 @@ releases:
 
   # Entra ID sign-in in front of code-server.
   - name: oauth2-proxy
-    namespace: chat
+    namespace: agent-platform
     chart: bjw-s-labs/app-template
     version: 5.1.0
     values:
       - values/oauth2-proxy.yaml.gotmpl
     needs:
-      - chat/code-server
+      - agent-platform/code-server
 
   # Job template for Claude Code turns; Jobs share code-server's workspace volume.
   - name: claude-job
-    namespace: chat
+    namespace: agent-platform
     chart: bjw-s-labs/app-template
     version: 5.1.0
     values:
       - values/claude-job.yaml.gotmpl
     needs:
-      - chat/code-server
+      - agent-platform/code-server
 
   - name: mcp-test-server
-    namespace: chat
+    namespace: agent-platform
     chart: bjw-s-labs/app-template
     version: 5.1.0
     values:

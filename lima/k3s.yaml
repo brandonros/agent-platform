@@ -31,4 +31,4 @@ probes:
       #!/bin/sh
       set -eu
       sudo k3s kubectl wait node --all --for=condition=Ready --timeout=60s
-    hint: See `limactl shell chat sudo journalctl -u k3s`.
+    hint: See `limactl shell agent-platform sudo journalctl -u k3s`.

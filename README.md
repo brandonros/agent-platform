@@ -1,4 +1,4 @@
-# chat-poc
+# agent-platform
 
 Organizational Claude Code in a local Kubernetes lab. People use the real Claude
 Code (VS Code extension) in a browser through code-server. Automated work runs
@@ -20,24 +20,29 @@ into the image as managed configuration.
 
 ## Deploy
 
-Requires Lima 2+, Helmfile, Helm, just, kubectl, Python 3, and OpenSSL, plus a
-Microsoft Entra ID app registration for sign-in:
+Requires Lima 2+, Helmfile, Helm, just, kubectl, Python 3, and OpenSSL. Copy
+`.env.example` to `.env` and set `CLAUDE_CODE_OAUTH_TOKEN`, then:
+
+```bash
+just bootstrap            # VM "agent-platform", namespace "agent-platform"
+just code-server          # http://localhost:8080
+```
+
+code-server runs with `--auth none` and has no ingress. Sign-in is optional
+Microsoft Entra ID through oauth2-proxy. Without it, `just code-server` forwards
+straight to code-server, reachable only from your machine.
+
+To add Entra ID sign-in:
 
 1. Entra admin center → App registrations → New registration. Single tenant.
    Redirect URI: platform **Web**, `http://localhost:8080/oauth2/callback`.
 2. Certificates & secrets → New client secret.
-3. Copy `.env.example` to `.env` and set `CLAUDE_CODE_OAUTH_TOKEN`,
-   `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` (application ID), and `ENTRA_CLIENT_SECRET`.
+3. Set `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` (application ID), and
+   `ENTRA_CLIENT_SECRET` in `.env`, then `just secrets && just apply`.
 
-```bash
-just bootstrap
-just code-server          # http://localhost:8080, sign in with Entra ID
-```
-
-code-server runs with `--auth none` and has no ingress; the only way in is
-oauth2-proxy, which signs people in with Entra ID and proxies to code-server.
-Any account in the tenant may sign in; restrict it with `OAUTH2_PROXY_ALLOWED_GROUPS`
-(group object IDs) in `values/oauth2-proxy.yaml.gotmpl`.
+`just apply` deploys oauth2-proxy only when its Secret exists, and `just code-server`
+then forwards through it. Any account in the tenant may sign in; restrict it with
+`OAUTH2_PROXY_ALLOWED_GROUPS` (group object IDs) in `values/oauth2-proxy.yaml.gotmpl`.
 
 Use `localhost`: browsers block service workers and webviews (including the
 Claude Code panel) on plain-HTTP hosts, and the Entra redirect URI is registered

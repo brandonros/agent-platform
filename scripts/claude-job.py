@@ -21,7 +21,7 @@ import sys
 import time
 import uuid
 
-NAMESPACE = "chat"
+NAMESPACE = "agent-platform"
 
 
 def default_caller():

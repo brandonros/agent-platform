@@ -28,7 +28,7 @@ if [[ ! "$tag" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}$ ]]; then
     exit 2
 fi
 
-vm="chat"
+vm="agent-platform"
 image="$image_name:$tag"
 local_context="$(mktemp -d)"
 remote_context=""
@@ -63,9 +63,13 @@ tar -xzf "$context/context.tar.gz" -C "$context"
 rm "$context/context.tar.gz"
 
 echo "Building $image"
+build_args=()
+if [[ -n "$base_tag" ]]; then
+    build_args=(--build-arg "BASE_TAG=$base_tag")
+fi
 sudo docker build \
     --tag "$image" \
-    --build-arg "BASE_TAG=$base_tag" \
+    "${build_args[@]}" \
     --file "$context/$app_dir/Dockerfile" \
     "$context"
 

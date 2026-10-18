@@ -10,7 +10,7 @@ controllers:
         # No password: sign-in is oauth2-proxy (Entra ID) in front; no ingress.
         args: ["--bind-addr", "0.0.0.0:8080", "--auth", "none", "/home/coder/workspace"]
         env:
-          CLAUDE_CODE_OAUTH_TOKEN: {valueFrom: {secretKeyRef: {name: chat-secrets, key: oauth-token}}}
+          CLAUDE_CODE_OAUTH_TOKEN: {valueFrom: {secretKeyRef: {name: claude-secrets, key: oauth-token}}}
         resources: {requests: {cpu: 250m, memory: 512Mi}, limits: {memory: 2Gi}}
 persistence:
   # Mount only workspace and ~/.claude so the CLI and extension installed in the

@@ -31,7 +31,7 @@ configMaps:
                     {"name": "PROMPT", "value": ""},
                     {"name": "SESSION_ID", "value": ""},
                     {"name": "CLAUDE_CODE_ENTRYPOINT", "value": "claude-vscode"},
-                    {"name": "CLAUDE_CODE_OAUTH_TOKEN", "valueFrom": {"secretKeyRef": {"name": "chat-secrets", "key": "oauth-token"}}}
+                    {"name": "CLAUDE_CODE_OAUTH_TOKEN", "valueFrom": {"secretKeyRef": {"name": "claude-secrets", "key": "oauth-token"}}}
                   ],
                   "resources": {"requests": {"cpu": "100m", "memory": "256Mi"}, "limits": {"memory": "1Gi"}},
                   "volumeMounts": [
