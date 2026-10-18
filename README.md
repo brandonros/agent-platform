@@ -142,7 +142,7 @@ provided by the SDK; they are separate from answer text and tool results.
 
 The cluster-only MCP test server provides `mcp__lab__echo`. General and integration
 profiles configure its URL programmatically through SDK `mcp_servers`; no
-`.mcp.json` is required. Runner network policy permits that server on port 8000.
+`.mcp.json` is required.
 
 ## Runtime API and storage
 
@@ -177,7 +177,7 @@ session. SQLite scheduling and local-path RWO storage do not support simply addi
 API replicas or spreading runners across nodes. Jobs have bounded time/turn/budget
 limits. Workers have no Kubernetes token or runtime API key. All Claude Code tools,
 including Bash, Edit, and Write, run without approval prompts (`bypassPermissions`);
-the Job pod and its network policy are the only sandbox. This is not a hostile-tenant sandbox.
+the Job pod is the only sandbox, and it has unrestricted network access. This is not a hostile-tenant sandbox.
 
 Production work remains around credentials, shared storage, retention/backups,
 capacity, pinned images, and multi-user workflow ownership. Attachments and

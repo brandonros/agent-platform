@@ -29,15 +29,3 @@ service:
     controller: main
     ports:
       http: {port: 8000}
-rawResources:
-  network:
-    manifest:
-      apiVersion: networking.k8s.io/v1
-      kind: NetworkPolicy
-      spec:
-        podSelector: {matchLabels: {app.kubernetes.io/instance: mcp-test-server}}
-        policyTypes: [Ingress]
-        ingress:
-          - from:
-              - podSelector: {matchLabels: {app: claude-runner}}
-            ports: [{protocol: TCP, port: 8000}]
