@@ -133,3 +133,11 @@ One shared code-server instance behind Entra ID sign-in, with one shared Claude
 token: everyone who signs in uses the same workspace and identity inside it.
 The lab VM has 4 GiB of memory. Per-user workspaces (for example Coder) and
 trusted HTTPS are not set up.
+
+## Related
+
+- [ace](https://github.com/brandonros/ace): research and background behind
+  this lab (agent command centers, background coding agents, sandboxes).
+- [claude-in-a-box](https://github.com/brandonros/claude-in-a-box) (archived):
+  the earlier approach, Claude Code behind Open WebUI through an OpenAI-compatible
+  wrapper. Replaced here by the real Claude Code extension in code-server.
