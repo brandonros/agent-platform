@@ -15,7 +15,7 @@ provision:
     script: |
       #!/bin/sh
       set -eu
-      # Helmfile owns Traefik. Keep k3s ServiceLB and local-path storage.
+      # No ingress: access is kubectl port-forward. Keep ServiceLB and local-path storage.
       mkdir -p /etc/rancher/k3s
       cat > /etc/rancher/k3s/config.yaml <<'K3S'
       disable:
@@ -26,6 +26,8 @@ provision:
         curl -fsSL https://get.k3s.io |
           INSTALL_K3S_VERSION=v1.36.5+k3s1 sh -s - server
       fi
+      # Docker builds images (just build-image), which are then imported into k3s.
+      command -v docker >/dev/null || { apt-get update && apt-get install -y docker.io; }
 probes:
   - script: |
       #!/bin/sh

@@ -5,6 +5,9 @@ export KUBECONFIG := justfile_directory() / ".kubeconfig"
 default:
     @just --list
 
+# First-time setup: VM, secrets, both images, releases.
+bootstrap: init secrets (build-image "claude-base") (build-image "code-server") apply
+
 # Create/start the VM and write its kubeconfig.
 init:
     #!/usr/bin/env bash
@@ -18,56 +21,48 @@ init:
     umask 077
     limactl shell agent-platform sudo cat /etc/rancher/k3s/k3s.yaml > "$KUBECONFIG"
 
-# Store the Claude token and, when set, Entra ID app credentials; keeps the generated cookie secret.
-# Reads CLAUDE_CODE_OAUTH_TOKEN and optional ENTRA_TENANT_ID/ENTRA_CLIENT_ID/ENTRA_CLIENT_SECRET (env or .env).
+# Store CLAUDE_CODE_OAUTH_TOKEN and, when ENTRA_* are set, oauth2-proxy credentials (keeping its cookie secret).
 secrets:
     #!/usr/bin/env bash
     set -euo pipefail
-    token="${CLAUDE_CODE_OAUTH_TOKEN:-}"
-    if [ -z "$token" ]; then
-      read -rsp "Token from 'claude setup-token': " token
-      echo
-    fi
-    [ -n "$token" ] || { echo "No token given" >&2; exit 1; }
-    kubectl create namespace agent-platform --dry-run=client -o yaml | kubectl apply -f -
-    # Empty when the Secret or key doesn't exist yet (first run).
-    existing() {
-      { kubectl -n agent-platform get secret "$1" -o "jsonpath={.data.$2}" 2>/dev/null || true; } | base64 -d
-    }
+    : "${CLAUDE_CODE_OAUTH_TOKEN:?set it in .env (from 'claude setup-token')}"
     # Values go through files, not argv, so they stay out of the process list.
-    kubectl -n agent-platform create secret generic claude-secrets \
-      --from-file=oauth-token=<(printf %s "$token") \
-      --dry-run=client -o yaml | kubectl apply --server-side --force-conflicts -f -
+    secret() { kubectl -n agent-platform create secret generic "$@" --dry-run=client -o yaml | kubectl apply --server-side --force-conflicts -f -; }
+    kubectl create namespace agent-platform --dry-run=client -o yaml | kubectl apply -f -
+    secret claude-secrets --from-file=oauth-token=<(printf %s "$CLAUDE_CODE_OAUTH_TOKEN")
     if [ -z "${ENTRA_TENANT_ID:-}" ] || [ -z "${ENTRA_CLIENT_ID:-}" ] || [ -z "${ENTRA_CLIENT_SECRET:-}" ]; then
       echo "Entra ID not configured (ENTRA_* unset); oauth2-proxy will not be deployed." >&2
       exit 0
     fi
-    cookie="$(existing oauth2-proxy cookie-secret)"
-    kubectl -n agent-platform create secret generic oauth2-proxy \
+    cookie="$({ kubectl -n agent-platform get secret oauth2-proxy -o 'jsonpath={.data.cookie-secret}' 2>/dev/null || true; } | base64 -d)"
+    secret oauth2-proxy \
       --from-file=tenant-id=<(printf %s "$ENTRA_TENANT_ID") \
       --from-file=client-id=<(printf %s "$ENTRA_CLIENT_ID") \
       --from-file=client-secret=<(printf %s "$ENTRA_CLIENT_SECRET") \
-      --from-file=cookie-secret=<(printf %s "${cookie:-$(openssl rand -base64 32 | tr -- '+/' '-_')}") \
-      --dry-run=client -o yaml | kubectl apply --server-side --force-conflicts -f -
+      --from-file=cookie-secret=<(printf %s "${cookie:-$(openssl rand -base64 32 | tr -- '+/' '-_')}")
     kubectl -n agent-platform rollout restart deployment/oauth2-proxy 2>/dev/null || true
 
-# Install Traefik, then deploy the apps. oauth2-proxy only when its Secret exists (Entra configured).
-apply:
+# Build an image in the VM and import it into k3s, tagged from image-tags.yaml. Bump the tag for changes.
+build-image component:
     #!/usr/bin/env bash
-    set -eu
-    kubectl -n agent-platform get secret claude-secrets >/dev/null 2>&1 ||
-      { echo "Run 'just secrets' first" >&2; exit 1; }
-    if kubectl -n agent-platform get secret oauth2-proxy >/dev/null 2>&1; then
-      helmfile sync
-    else
-      helmfile -l 'name!=oauth2-proxy' sync
-    fi
+    set -euo pipefail
+    tag() { awk -F'"' "/^$1:/ {print \$2}" image-tags.yaml; }
+    image="$1:$(tag "$1")"
+    COPYFILE_DISABLE=1 tar --no-xattrs --exclude=__pycache__ -cz apps agents skills |
+      limactl shell --workdir / agent-platform sudo docker build -t "$image" \
+        --build-arg "BASE_TAG=$(tag claude-base)" -f "apps/$1/Dockerfile" -
+    limactl shell --workdir / agent-platform sh -c "sudo docker save $image | sudo k3s ctr images import -"
+
+# Deploy the releases; oauth2-proxy only when its Secret exists (Entra configured).
+apply:
+    kubectl -n agent-platform get secret claude-secrets >/dev/null || { echo "Run 'just secrets' first" >&2; exit 1; }
+    helmfile $(kubectl -n agent-platform get secret oauth2-proxy >/dev/null 2>&1 || echo "-l name!=oauth2-proxy") sync
 
 diff:
     helmfile diff
 
 status:
-    kubectl -n agent-platform get pods,pvc,ingress
+    kubectl -n agent-platform get pods,pvc
 
 # Pod memory and CPU use, and the guest's overall memory.
 top:
@@ -100,11 +95,3 @@ logs app="code-server":
 # Remove Helm releases; volumes and the Secret remain.
 destroy:
     helmfile destroy
-
-# Build and import an image into the lab VM. Use a new tag for changes.
-build-image component tag:
-    @bash scripts/build-image.sh "$1" "$2"
-
-# Initialize the lab, build the code-server image, and deploy everything.
-bootstrap:
-    @bash scripts/bootstrap.sh

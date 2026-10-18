@@ -1,9 +1,5 @@
 ---
-# Skip diff validation on first install: dependency CRDs don't exist yet.
-
 repositories:
-  - name: traefik
-    url: https://traefik.github.io/charts
   - name: bjw-s-labs
     url: ghcr.io/bjw-s-labs/helm
     oci: true
@@ -16,24 +12,12 @@ helmDefaults:
   atomic: false
 
 releases:
-  # Ingress. Bundled k3s Traefik is disabled in lima/k3s.yaml.
-  - name: traefik
-    namespace: kube-system
-    chart: traefik/traefik
-    version: 41.5.0
-    values:
-      - values/traefik.yaml
-    disableValidationOnInstall: true
-
   - name: code-server
     namespace: agent-platform
     chart: bjw-s-labs/app-template
     version: 5.1.0
     values:
       - values/code-server.yaml.gotmpl
-    needs:
-      - kube-system/traefik
-    disableValidationOnInstall: true
 
   # Entra ID sign-in in front of code-server.
   - name: oauth2-proxy

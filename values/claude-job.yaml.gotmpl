@@ -1,5 +1,4 @@
-{{- $tags := readFile "../image-tags.yaml" | fromYaml -}}
-{{- $image := printf "claude-base:%s" (env "CLAUDE_BASE_IMAGE_TAG" | default (index $tags "claude-base")) -}}
+{{- $image := printf "claude-base:%s" (index (readFile "../image-tags.yaml" | fromYaml) "claude-base") -}}
 # Job template for one Claude Code turn in the shared workspace. Dispatchers read
 # it from the cluster and set metadata.name, labels, PROMPT, and SESSION_ID.
 configMaps:

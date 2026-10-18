@@ -16,7 +16,6 @@ into the image as managed configuration.
 | (Job template) | `values/claude-job.yaml.gotmpl` | `claude-job-template` ConfigMap: the Job spec for one Claude Code turn (`claude-base` image) |
 | `scripts/claude-job.py` | (none) | Dispatches a turn: fills the template's name, prompt, and session |
 | (upstream) | `values/oauth2-proxy.yaml.gotmpl` | Entra ID sign-in in front of code-server |
-| (upstream) | `values/traefik.yaml` | Traefik ingress |
 
 ## Deploy
 
@@ -54,16 +53,14 @@ claude-base:<claude-base tag>`, so after changing org config, agents, skills, or
 the CLI, rebuild both:
 
 ```bash
-just build-image claude-base 2
-# set claude-base: "2" in image-tags.yaml
-just build-image code-server 8
-# set code-server: "8" in image-tags.yaml
+# bump both tags in image-tags.yaml, then:
+just build-image claude-base
+just build-image code-server
 helmfile -l name=code-server -l name=claude-job sync
 ```
 
-For editor-only changes (`apps/code-server/Dockerfile`), rebuild only
-`code-server`. `CLAUDE_BASE_IMAGE_TAG` and `CODE_SERVER_IMAGE_TAG` override
-`image-tags.yaml` for one build or sync.
+For editor-only changes (`apps/code-server/Dockerfile`), bump and rebuild only
+`code-server`.
 
 The VS Code extension bundles its own Claude Code, so IDE sessions and Jobs can
 run slightly different Claude Code versions; they share the same session files.

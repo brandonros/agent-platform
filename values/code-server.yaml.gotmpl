@@ -1,5 +1,4 @@
-{{- $tags := readFile "../image-tags.yaml" | fromYaml -}}
-{{- $tag := env "CODE_SERVER_IMAGE_TAG" | default (index $tags "code-server") -}}
+{{- $tag := index (readFile "../image-tags.yaml" | fromYaml) "code-server" -}}
 defaultPodOptions:
   securityContext: {runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000}
 controllers:
