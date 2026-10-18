@@ -1,4 +1,4 @@
-"""One SDK turn in a session-scoped filesystem. No API or Kubernetes credentials."""
+"""One SDK turn in a session-scoped filesystem with all tools allowed. No API or Kubernetes credentials."""
 import asyncio
 from dataclasses import fields, is_dataclass
 import json
@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 from jsonschema import Draft7Validator
 
-from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient, HookMatcher, PermissionResultDeny, ResultMessage
+from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient, ResultMessage
 
 
 def encode(value):
@@ -26,41 +26,6 @@ def atomic_json(path, value):
     temporary.replace(path)
 
 
-async def deny_unapproved(name, args, context):
-    return PermissionResultDeny(message=f"Tool {name} is not approved for this profile")
-
-
-def read_boundary(workspace, config, extra_tools=(), structured=False):
-    """Enforce read scope even for tools pre-approved by allowed_tools."""
-    roots = (workspace.resolve(), config.resolve())
-    async def hook(input, tool_use_id, context):
-        name, args = input.get("tool_name"), input.get("tool_input", {})
-        if name in ("Agent", "Task"):
-            if args.get("subagent_type") in {p.stem for p in (config / ".claude/agents").glob("*.md")}:
-                return {}
-        if name == "StructuredOutput" and structured:
-            return {}
-        if name == "Skill" or name in extra_tools:
-            return {}
-        if name not in ("Read", "Glob", "Grep"):
-            allowed = False
-        else:
-            raw = args.get("file_path") if name == "Read" else args.get("path", str(workspace))
-            path = Path(raw or str(workspace)).expanduser()
-            if not path.is_absolute():
-                path = workspace / path
-            path = path.resolve()
-            allowed = any(path == root or root in path.parents for root in roots)
-            if name == "Glob":
-                pattern = Path(args.get("pattern", ""))
-                allowed = allowed and not pattern.is_absolute() and ".." not in pattern.parts
-        if allowed:
-            return {}
-        return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
-                "permissionDecisionReason": "Read access is limited to the session workspace and organizational configuration."}}
-    return hook
-
-
 async def execute(session, run_id, client_factory=ClaudeSDKClient):
     run = session / "runs" / run_id
     if (run / "cancel").exists():
@@ -76,7 +41,6 @@ async def execute(session, run_id, client_factory=ClaudeSDKClient):
         if not target.exists() and not target.is_symlink():
             target.symlink_to(config / name, target_is_directory=name == ".claude")
     profile = spec.get("profile", {})
-    extra_tools = profile.get("allowed_tools", [])
     schema = spec.get("output_schema")
     if schema is not None:
         Draft7Validator.check_schema(schema)
@@ -87,12 +51,9 @@ async def execute(session, run_id, client_factory=ClaudeSDKClient):
         mcp_servers=profile.get("mcp_servers", {}), thinking=profile.get("thinking"),
         cwd=str(workspace), model=spec["model"], resume=spec.get("sdk_id"),
         fork_session=spec.get("fork", False), resume_session_at=spec.get("resume_at"),
-        env={"HOME": str(session / "home"), "CLAUDE_CONFIG_DIR": str(session / "home/.claude"), "CLAUDE_AGENT_SDK_DISABLE_BUILTIN_AGENTS": "1"},
+        env={"HOME": str(session / "home"), "CLAUDE_CONFIG_DIR": str(session / "home/.claude")},
         system_prompt={"type": "preset", "preset": "claude_code", "append": profile.get("prompt", "") + "\n\n" + spec["system_prompt"], "snapshot": False},
-        setting_sources=["project"], tools=["Skill", "Read", "Glob", "Grep", "Agent"] + (["StructuredOutput"] if schema is not None else []),
-        allowed_tools=["Skill", "Read", "Glob", "Grep", "Agent"] + extra_tools, permission_mode="default",
-        hooks={"PreToolUse": [HookMatcher(hooks=[read_boundary(workspace, config, extra_tools, schema is not None)])]},
-        can_use_tool=deny_unapproved, max_turns=8, max_budget_usd=1.0, include_partial_messages=True,
+        setting_sources=["project"], permission_mode="bypassPermissions", max_turns=8, max_budget_usd=1.0, include_partial_messages=True,
     )
     result = {"status": "failed", "error": "SDK ended without a ResultMessage", "result": None}
     async def watch_cancel(client):

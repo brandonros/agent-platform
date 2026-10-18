@@ -1,7 +1,7 @@
 """
 title: Organizational Claude Code
 version: 0.5.1
-description: Thin renderer for the official-SDK lab service. Read-only tools.
+description: Thin renderer for the official-SDK lab service.
 """
 import asyncio
 import hashlib

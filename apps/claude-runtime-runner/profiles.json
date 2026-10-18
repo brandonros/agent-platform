@@ -11,10 +11,7 @@
         "type": "http",
         "url": "http://mcp-test-server.chat.svc.cluster.local:8000/mcp"
       }
-    },
-    "allowed_tools": [
-      "mcp__lab__echo"
-    ]
+    }
   },
   "writer": {
     "name": "writer",
@@ -24,10 +21,7 @@
         "type": "http",
         "url": "http://mcp-test-server.chat.svc.cluster.local:8000/mcp"
       }
-    },
-    "allowed_tools": [
-      "mcp__lab__echo"
-    ]
+    }
   },
   "reviewer": {
     "name": "reviewer",
@@ -42,9 +36,6 @@
         "url": "http://mcp-test-server.chat.svc.cluster.local:8000/mcp"
       }
     },
-    "allowed_tools": [
-      "mcp__lab__echo"
-    ],
     "thinking": {
       "type": "adaptive",
       "display": "summarized"

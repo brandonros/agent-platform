@@ -175,8 +175,9 @@ Branching copies current workspace files; it is not a historical filesystem snap
 This lab has one API replica, at most two active Jobs, and serialized turns per
 session. SQLite scheduling and local-path RWO storage do not support simply adding
 API replicas or spreading runners across nodes. Jobs have bounded time/turn/budget
-limits. Workers have no Kubernetes token or runtime API key; read hooks restrict
-access to workspace and organizational files. This is not a hostile-tenant sandbox.
+limits. Workers have no Kubernetes token or runtime API key. All Claude Code tools,
+including Bash, Edit, and Write, run without approval prompts (`bypassPermissions`);
+the Job pod and its network policy are the only sandbox. This is not a hostile-tenant sandbox.
 
 Production work remains around credentials, shared storage, retention/backups,
 capacity, pinned images, and multi-user workflow ownership. Attachments and
@@ -214,8 +215,7 @@ latest HTTP check. The one-off acceptance scripts were removed after the experim
 `agents/` sits beside `skills/`. Following [Claude Code's native subagent format](https://code.claude.com/docs/en/sub-agents), each agent is a Markdown file
 with YAML frontmatter (`name`, `description`, and optional `model: inherit`), then
 its role instructions. `agents/meeting-facilitator.md` is a nontechnical example.
-Keep the filename stem equal to `name`; the runtime permission hook uses it as
-its delegation allowlist. These definitions are baked into `.claude/agents/` in
+Keep the filename stem equal to `name`. These definitions are baked into `.claude/agents/` in
 the runner image. Rebuild the runner and select its new tag after edits.
 
 In one saved chat, ask "Use the writer agent to draft this", then "Use the reviewer

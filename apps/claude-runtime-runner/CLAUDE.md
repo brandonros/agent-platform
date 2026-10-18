@@ -1,7 +1,7 @@
 # Organizational Claude Code lab
 
 Use the team-glossary skill for organizational terminology. Do not invent definitions.
-This deployment currently has a read-only tool profile. Report tool failures honestly.
+All Claude Code tools are available without approval prompts. Report tool failures honestly.
 
 Conversation transcripts are persisted by the service and resumed for follow-up
 messages, including after worker replacement. Remembering something in this
