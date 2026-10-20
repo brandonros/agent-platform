@@ -29,7 +29,7 @@ releases:
     needs:
       - agent-platform/code-server
 
-  # Job template for Claude Code turns; Jobs share code-server's workspace volume.
+  # Job template for Claude Code turns; session directories share the existing PVC.
   - name: claude-job
     namespace: agent-platform
     chart: bjw-s-labs/app-template

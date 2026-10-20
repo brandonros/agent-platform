@@ -73,7 +73,7 @@ top:
 stop:
     limactl stop agent-platform
 
-# Run a Claude Code turn as a Job in the code-server workspace. Extra args: --session UUID, --turn-id ID, --started-by WHO, --wait.
+# Run a turn in its persistent session workspace. Extra args: --session UUID, --turn-id ID, --started-by WHO, --wait.
 claude-job prompt *args:
     @python3 scripts/claude-job.py "$@"
 
@@ -95,3 +95,11 @@ logs app="code-server":
 # Remove Helm releases; volumes and the Secret remain.
 destroy:
     helmfile destroy
+
+# Open a session-specific IDE; Ctrl-C stops forwarding but retains ownership.
+session-open session:
+    @python3 scripts/claude-session.py open "$1"
+
+# Stop the session IDE and allow automated turns again; files are retained.
+session-close session:
+    @python3 scripts/claude-session.py close "$1"

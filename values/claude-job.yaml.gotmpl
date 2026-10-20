@@ -1,10 +1,11 @@
 {{- $image := printf "claude-base:%s" (index (readFile "../image-tags.yaml" | fromYaml) "claude-base") -}}
-# Job template for one Claude Code turn in the shared workspace. Dispatchers read
+# Job template for one turn. The dispatcher injects session-specific mounts. Dispatchers read
 # it from the cluster and set metadata.name, labels, PROMPT, and SESSION_ID.
 configMaps:
   template:
     forceRename: claude-job-template
     data:
+      ide-image: {{ printf "code-server:%s" (index (readFile "../image-tags.yaml" | fromYaml) "code-server") | quote }}
       job.json: |
         {
           "apiVersion": "batch/v1",
