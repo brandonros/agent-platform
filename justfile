@@ -48,7 +48,7 @@ build-image component:
     set -euo pipefail
     tag() { awk -F'"' "/^$1:/ {print \$2}" image-tags.yaml; }
     image="$1:$(tag "$1")"
-    COPYFILE_DISABLE=1 tar --no-xattrs --exclude=__pycache__ -cz apps agents skills |
+    COPYFILE_DISABLE=1 tar --no-xattrs --exclude=__pycache__ --exclude=node_modules --exclude=out --exclude="*.vsix" -cz apps agents skills |
       limactl shell --workdir / agent-platform sudo docker build -t "$image" \
         --build-arg "BASE_TAG=$(tag claude-base)" -f "apps/$1/Dockerfile" -
     limactl shell --workdir / agent-platform sh -c "sudo docker save $image | sudo k3s ctr images import -"

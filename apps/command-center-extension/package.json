@@ -1,0 +1,76 @@
+{
+  "name": "command-center",
+  "displayName": "Command Center",
+  "description": "Jira tickets linked to Claude Code conversations",
+  "version": "0.1.0",
+  "publisher": "org",
+  "private": true,
+  "engines": {"vscode": "^1.90.0"},
+  "main": "./out/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "extensionDependencies": ["anthropic.claude-code"],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [{"id": "commandCenter", "title": "Command Center", "icon": "media/icon.svg"}]
+    },
+    "views": {
+      "commandCenter": [{"id": "commandCenter.tickets", "name": "Tickets"}]
+    },
+    "commands": [
+      {"command": "commandCenter.refresh", "title": "Refresh", "icon": "$(refresh)"},
+      {"command": "commandCenter.newConversation", "title": "New Claude Conversation", "icon": "$(add)"},
+      {"command": "commandCenter.openConversation", "title": "Open Conversation"},
+      {"command": "commandCenter.openInJira", "title": "Open in Jira", "icon": "$(link-external)"}
+    ],
+    "menus": {
+      "view/title": [{"command": "commandCenter.refresh", "when": "view == commandCenter.tickets", "group": "navigation"}],
+      "view/item/context": [
+        {"command": "commandCenter.newConversation", "when": "view == commandCenter.tickets && viewItem == ticket", "group": "inline"},
+        {"command": "commandCenter.openInJira", "when": "view == commandCenter.tickets && viewItem == ticket", "group": "inline"}
+      ],
+      "commandPalette": [
+        {"command": "commandCenter.newConversation", "when": "false"},
+        {"command": "commandCenter.openConversation", "when": "false"},
+        {"command": "commandCenter.openInJira", "when": "false"}
+      ]
+    },
+    "configuration": {
+      "title": "Command Center",
+      "properties": {
+        "commandCenter.jira.baseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Jira base URL, e.g. https://example.atlassian.net. Empty shows demo tickets. Credentials come from JIRA_EMAIL + JIRA_API_TOKEN (Cloud) or JIRA_PAT (Data Center)."
+        },
+        "commandCenter.userEmail": {
+          "type": "string",
+          "default": "",
+          "description": "Replaces ${userEmail} in JQL presets (for service-account tokens, where currentUser() is the bot). Defaults to COMMAND_CENTER_USER_EMAIL."
+        },
+        "commandCenter.jqlPresets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {"name": {"type": "string"}, "jql": {"type": "string"}},
+            "required": ["name", "jql"]
+          },
+          "default": [
+            {"name": "My sprint", "jql": "assignee = currentUser() AND sprint in openSprints() ORDER BY Rank"},
+            {"name": "My open tickets", "jql": "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"}
+          ],
+          "description": "Ticket groups shown in the tree."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "package": "tsc -p . && vsce package --no-dependencies --allow-missing-repository --skip-license -o command-center.vsix"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "1.90.0",
+    "@vscode/vsce": "^3.0.0",
+    "typescript": "^5.6.0"
+  }
+}
