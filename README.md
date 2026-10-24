@@ -6,6 +6,24 @@ as Kubernetes Jobs in persistent per-session workspaces. A session-specific
 browser IDE opens the same files and conversation history. Org agents, skills, MCP servers, and instructions are baked
 into the image as managed configuration.
 
+## Ponies
+
+Every good lab needs ponies. Think of each session workspace as a pasture: a
+persistent, per-session place where one pony (a Claude Code agent) can graze on a
+task, wander off between turns, and come back to find its hay (files, uncommitted
+changes, and history) right where it left it.
+
+| Platform concept | Pony equivalent |
+|---|---|
+| Session workspace | The pasture |
+| Job (one Claude Code turn) | A trot around the paddock |
+| Lease | The stable door: one pony in a stall at a time |
+| Session IDE | Visiting the pony in its stall |
+| `session-close` | Closing the stable door (the pasture stays) |
+
+Please do not feed the ponies secrets: keep `CLAUDE_CODE_OAUTH_TOKEN` in `.env`,
+not in the hay.
+
 ## Components
 
 | App | Helm values | Purpose |
