@@ -21,7 +21,7 @@ init:
     umask 077
     limactl shell agent-platform sudo cat /etc/rancher/k3s/k3s.yaml > "$KUBECONFIG"
 
-# Store CLAUDE_CODE_OAUTH_TOKEN, Jira credentials when JIRA_* are set, and, when ENTRA_* are set, oauth2-proxy credentials (keeping its cookie secret).
+# Store CLAUDE_CODE_OAUTH_TOKEN, Jira credentials and git identity when set, and, when ENTRA_* are set, oauth2-proxy credentials (keeping its cookie secret).
 secrets:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -38,6 +38,15 @@ secrets:
       kubectl -n agent-platform rollout restart deployment/code-server 2>/dev/null || true
     else
       echo "Jira not configured (JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN); Command Center shows demo tickets." >&2
+    fi
+    if [ -n "${GIT_USER_NAME:-}" ] && [ -n "${GIT_USER_EMAIL:-}" ]; then
+      secret git-identity \
+        --from-file=GIT_AUTHOR_NAME=<(printf %s "$GIT_USER_NAME") \
+        --from-file=GIT_AUTHOR_EMAIL=<(printf %s "$GIT_USER_EMAIL") \
+        --from-file=GIT_COMMITTER_NAME=<(printf %s "$GIT_USER_NAME") \
+        --from-file=GIT_COMMITTER_EMAIL=<(printf %s "$GIT_USER_EMAIL")
+    else
+      echo "Git identity not configured (GIT_USER_NAME, GIT_USER_EMAIL); commits will fail until a repo sets one." >&2
     fi
     if [ -z "${ENTRA_TENANT_ID:-}" ] || [ -z "${ENTRA_CLIENT_ID:-}" ] || [ -z "${ENTRA_CLIENT_SECRET:-}" ]; then
       echo "Entra ID not configured (ENTRA_* unset); oauth2-proxy will not be deployed." >&2
