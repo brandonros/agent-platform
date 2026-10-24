@@ -6,6 +6,17 @@ as Kubernetes Jobs in persistent per-session workspaces. A session-specific
 browser IDE opens the same files and conversation history. Org agents, skills, MCP servers, and instructions are baked
 into the image as managed configuration.
 
+## Horsies
+
+Think of the platform as a stable of horsies. Each session is a horsie with its
+own stall (`sessions/<uuid>/workspace/`) and its own saddlebag of history
+(`sessions/<uuid>/claude/`). Dispatching a turn with `just claude-job` sends a
+horsie out for a run, and the Lease is the stable door: while a horsie is out or
+someone is visiting its stall (`session-open`), nobody else may take it. When the
+run is done (`session-close`), the horsie goes back to its stall with everything
+it was carrying, ready for the next turn. All the horsies eat the same feed: the
+org agents, skills, and MCP servers baked into `claude-base`.
+
 ## Components
 
 | App | Helm values | Purpose |
