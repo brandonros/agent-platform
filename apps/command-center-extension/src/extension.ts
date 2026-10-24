@@ -7,6 +7,7 @@ import * as fs from "node:fs";
 import * as vscode from "vscode";
 import * as conversations from "./conversations";
 import * as jira from "./jira";
+import * as workspaces from "./workspaces";
 
 type Preset = {kind: "preset"; name: string; jql: string};
 type TicketNode = {kind: "ticket"; preset: string; ticket: jira.Ticket};
@@ -127,11 +128,14 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("commandCenter.refresh", () => tree.refresh()),
     vscode.commands.registerCommand("commandCenter.openConversation", (node: ConversationNode) => {
       const c = node.conversation;
-      if (useTerminal()) return claudeInTerminal(c.title || c.sessionId.slice(0, 8), `--resume ${c.sessionId}`);
-      if (!c.headless) return vscode.commands.executeCommand(OPEN, c.sessionId);
-      vscode.window.showWarningMessage(
-        "This conversation was started with claude -p, which the Claude panel can't open. Run headless turns with CLAUDE_CODE_ENTRYPOINT=claude-vscode.",
-      );
+      if (c.headless && !useTerminal()) {
+        return vscode.window.showWarningMessage(
+          "This conversation was started with claude -p, which the Claude panel can't open. Run headless turns with CLAUDE_CODE_ENTRYPOINT=claude-vscode.",
+        );
+      }
+      // Conversations belong to the folder they ran in; switch there first.
+      const title = c.title || c.sessionId.slice(0, 8);
+      return workspaces.inFolder(context, {folder: c.cwd || workspaces.root(), sessionId: c.sessionId, title}, openClaude);
     }),
     vscode.commands.registerCommand("commandCenter.openInJira", (node: TicketNode) =>
       vscode.env.openExternal(vscode.Uri.parse(node.ticket.url)),
@@ -148,23 +152,28 @@ export function activate(context: vscode.ExtensionContext): void {
         "",
         "Read the full ticket(s) in Jira (description, acceptance criteria, comments) and propose a plan before changing code.",
       ].join("\n");
-      if (useTerminal()) return claudeInTerminal(tickets.map((t) => t.key).join(", "), `'${prompt.replaceAll("'", `'\\''`)}'`);
-      return vscode.commands.executeCommand(OPEN, undefined, prompt);
+      const keys = tickets.map((t) => t.key);
+      return workspaces.inFolder(context, {folder: workspaces.ensure(keys), prompt, title: keys.join(", ")}, openClaude);
     }),
     vscode.commands.registerCommand("commandCenter.toggleTerminal", async () => {
       await settings().update("useTerminal", !useTerminal(), vscode.ConfigurationTarget.Global);
       vscode.window.showInformationMessage(`Claude conversations open in the ${useTerminal() ? "terminal" : "panel"}.`);
     }),
   );
+
+  // Finish an open that switched the window to a ticket's folder.
+  workspaces.resume(context, openClaude);
 }
 
 function useTerminal(): boolean {
   return settings().get("useTerminal", false);
 }
 
-function claudeInTerminal(name: string, args: string): void {
-  const terminal = vscode.window.createTerminal({name});
-  terminal.sendText(`claude ${args}`);
+// Opens a conversation (sessionId) or starts one (prompt) in the panel or terminal.
+function openClaude({sessionId, prompt, title}: workspaces.Pending): unknown {
+  if (!useTerminal()) return vscode.commands.executeCommand(OPEN, sessionId, prompt);
+  const terminal = vscode.window.createTerminal({name: title});
+  terminal.sendText(sessionId ? `claude --resume ${sessionId}` : `claude '${prompt!.replaceAll("'", `'\\''`)}'`);
   terminal.show();
 }
 

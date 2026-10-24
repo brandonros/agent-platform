@@ -141,6 +141,11 @@
           "type": "boolean",
           "default": false,
           "description": "Open Claude conversations in the terminal (Claude Code CLI) instead of the Claude Code panel."
+        },
+        "commandCenter.workspaceRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Folder that holds one workspace folder per ticket (e.g. ~/Documents/coding). Defaults to ~/workspace."
         }
       }
     }
