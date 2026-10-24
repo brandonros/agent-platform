@@ -15,15 +15,16 @@ RUN curl -fsSL https://code-server.dev/install.sh | sh -s -- --version 4.141.0 \
     && rm -rf /usr/lib/code-server/lib/vscode/extensions/copilot
 USER coder
 COPY --from=command-center /src/command-center.vsix /tmp/command-center.vsix
-# Hide VS Code's own chat/AI UI by default.
+# Defaults go in Machine settings: User settings are on the user's PVC and override
+# them. Hide VS Code's own chat/AI UI by default.
 RUN code-server --install-extension anthropic.claude-code \
     && code-server --install-extension /tmp/command-center.vsix \
     && code-server --install-extension GitHub.vscode-pull-request-github \
-    && mkdir -p /home/coder/.local/share/code-server/User \
+    && mkdir -p /home/coder/.local/share/code-server/Machine \
     && printf '%s\n' '{' \
        '    "chat.disableAIFeatures": true,' \
        '    "claudeCode.preferredLocation": "panel",' \
        '    "workbench.startupEditor": "none"' \
-       '}' > /home/coder/.local/share/code-server/User/settings.json
+       '}' > /home/coder/.local/share/code-server/Machine/settings.json
 EXPOSE 8080
 ENTRYPOINT ["dumb-init", "code-server"]

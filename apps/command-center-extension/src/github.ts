@@ -38,7 +38,15 @@ export async function search(query: string, githubUser: string): Promise<PullReq
     headers: {Authorization: `bearer ${token}`, "Content-Type": "application/json"},
     body: JSON.stringify({query: QUERY, variables: {q}}),
   });
-  const body = (await res.json()) as {data?: {search: {nodes: any[]}}; errors?: {message: string}[]; message?: string};
+  // Rate limits and outages can answer with HTML, not JSON.
+  const text = await res.text();
+  let body: {data?: {search: {nodes: any[]}}; errors?: {message: string}[]; message?: string};
+  try {
+    body = JSON.parse(text);
+  } catch {
+    const limited = res.status === 403 || res.status === 429 ? " (rate limited; try Refresh in a minute)" : "";
+    throw new Error(`GitHub ${res.status}${limited}`);
+  }
   if (!res.ok || body.errors) {
     throw new Error(`GitHub ${res.status}: ${body.errors?.map((e) => e.message).join("; ") ?? body.message}`);
   }

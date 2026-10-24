@@ -30,8 +30,9 @@ controllers:
           - secretRef: {name: github, optional: true}
         resources: {requests: {cpu: 250m, memory: 512Mi}, limits: {memory: 2Gi}}
 persistence:
-  # The user's PVC: workspace (ticket folders) and ~/.claude, plus sessions/<uuid>/
-  # for Jobs. Mount only those so the CLI and extension under /home/coder stay visible.
+  # The user's PVC: workspace (ticket folders), ~/.claude, and editor settings and
+  # state, plus sessions/<uuid>/ for Jobs. Mount only those so the CLI and
+  # extensions installed under /home/coder stay visible.
   home:
     type: persistentVolumeClaim
     accessMode: ReadWriteOnce
@@ -39,6 +40,7 @@ persistence:
     globalMounts:
       - {path: /home/coder/workspace, subPath: workspace}
       - {path: /home/coder/.claude, subPath: claude}
+      - {path: /home/coder/.local/share/code-server/User, subPath: code-server-user}
 service:
   main:
     controller: main

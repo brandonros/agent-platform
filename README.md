@@ -176,7 +176,7 @@ IDE pod uses more of the lab VM's 4 GiB memory.
 Users have their own PVC and commit identity but share the Claude, Jira, and
 GitHub credentials and the Unix uid. This separates working state, not access. Organizational configuration comes from
 the images; mutable Claude settings are now per session. CLI and extension
-versions can still differ. Editor settings remain ephemeral.
+versions can still differ. Editor settings and state persist on the user's PVC.
 
 The lab VM's 60 GiB disk is sparse. Repeated image builds and retained multi-repo
 workspaces consume disk; monitor usage and archive unused sessions deliberately.
