@@ -65,6 +65,20 @@ For editor-only changes (`apps/code-server/Dockerfile`), bump and rebuild only
 The VS Code extension bundles its own Claude Code, so IDE sessions and Jobs can
 run slightly different Claude Code versions; they share the same session files.
 
+## Command reference
+
+`just` with no arguments lists every recipe. Day-to-day ones:
+
+| Recipe | What it does |
+|---|---|
+| `just status` | Pods and PVCs in the `agent-platform` namespace |
+| `just diff` | Preview what `just apply` would change (`helmfile diff`) |
+| `just logs [app]` | Follow a Deployment's logs (default `code-server`) |
+| `just top` | Pod CPU/memory and the VM's overall memory |
+| `just claude-jobs` | List Claude Code Jobs with their sessions and who started them |
+| `just stop` | Stop the VM; `just init` starts it again |
+| `just destroy` | Remove Helm releases; volumes and the Secret remain |
+
 ## Session workspaces and turns
 
 Apply the updated template first (`just apply`); no image rebuild is needed for
