@@ -105,7 +105,7 @@
         "commandCenter.jira.baseUrl": {
           "type": "string",
           "default": "",
-          "description": "Jira base URL, e.g. https://example.atlassian.net. Empty shows demo tickets. Credentials come from JIRA_EMAIL + JIRA_API_TOKEN (Cloud) or JIRA_PAT (Data Center)."
+          "description": "Jira base URL, e.g. https://example.atlassian.net. Defaults to JIRA_BASE_URL; empty shows demo tickets. Credentials come from JIRA_EMAIL + JIRA_API_TOKEN (Cloud) or JIRA_PAT (Data Center)."
         },
         "commandCenter.userEmail": {
           "type": "string",
@@ -131,15 +131,11 @@
           },
           "default": [
             {
-              "name": "My sprint",
-              "jql": "assignee = currentUser() AND sprint in openSprints() ORDER BY Rank"
-            },
-            {
-              "name": "My open tickets",
+              "name": "My tickets",
               "jql": "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
             }
           ],
-          "description": "Ticket groups shown in the tree."
+          "description": "One tree group per entry: a name and the JQL that backs it."
         },
         "commandCenter.useTerminal": {
           "type": "boolean",

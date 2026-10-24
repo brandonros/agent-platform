@@ -10,6 +10,9 @@ controllers:
         args: ["--bind-addr", "0.0.0.0:8080", "--auth", "none", "/home/coder/workspace"]
         env:
           CLAUDE_CODE_OAUTH_TOKEN: {valueFrom: {secretKeyRef: {name: claude-secrets, key: oauth-token}}}
+        # Command Center extension: JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN. Demo tickets without it.
+        envFrom:
+          - secretRef: {name: jira, optional: true}
         resources: {requests: {cpu: 250m, memory: 512Mi}, limits: {memory: 2Gi}}
 persistence:
   # Mount only workspace and ~/.claude so the CLI and extension installed in the

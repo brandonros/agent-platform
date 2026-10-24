@@ -176,7 +176,7 @@ function settings() {
 
 function jiraConfig(): jira.JiraConfig {
   return {
-    baseUrl: settings().get("jira.baseUrl", ""),
+    baseUrl: settings().get("jira.baseUrl", "") || process.env.JIRA_BASE_URL || "",
     userEmail: settings().get("userEmail", "") || process.env.COMMAND_CENTER_USER_EMAIL || "",
   };
 }

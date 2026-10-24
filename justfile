@@ -21,7 +21,7 @@ init:
     umask 077
     limactl shell agent-platform sudo cat /etc/rancher/k3s/k3s.yaml > "$KUBECONFIG"
 
-# Store CLAUDE_CODE_OAUTH_TOKEN and, when ENTRA_* are set, oauth2-proxy credentials (keeping its cookie secret).
+# Store CLAUDE_CODE_OAUTH_TOKEN, Jira credentials when JIRA_* are set, and, when ENTRA_* are set, oauth2-proxy credentials (keeping its cookie secret).
 secrets:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -30,6 +30,15 @@ secrets:
     secret() { kubectl -n agent-platform create secret generic "$@" --dry-run=client -o yaml | kubectl apply --server-side --force-conflicts -f -; }
     kubectl create namespace agent-platform --dry-run=client -o yaml | kubectl apply -f -
     secret claude-secrets --from-file=oauth-token=<(printf %s "$CLAUDE_CODE_OAUTH_TOKEN")
+    if [ -n "${JIRA_BASE_URL:-}" ] && [ -n "${JIRA_EMAIL:-}" ] && [ -n "${JIRA_API_TOKEN:-}" ]; then
+      secret jira \
+        --from-file=JIRA_BASE_URL=<(printf %s "$JIRA_BASE_URL") \
+        --from-file=JIRA_EMAIL=<(printf %s "$JIRA_EMAIL") \
+        --from-file=JIRA_API_TOKEN=<(printf %s "$JIRA_API_TOKEN")
+      kubectl -n agent-platform rollout restart deployment/code-server 2>/dev/null || true
+    else
+      echo "Jira not configured (JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN); Command Center shows demo tickets." >&2
+    fi
     if [ -z "${ENTRA_TENANT_ID:-}" ] || [ -z "${ENTRA_CLIENT_ID:-}" ] || [ -z "${ENTRA_CLIENT_SECRET:-}" ]; then
       echo "Entra ID not configured (ENTRA_* unset); oauth2-proxy will not be deployed." >&2
       exit 0
