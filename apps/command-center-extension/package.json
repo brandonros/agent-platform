@@ -5,33 +5,98 @@
   "version": "0.1.0",
   "publisher": "org",
   "private": true,
-  "engines": {"vscode": "^1.90.0"},
+  "engines": {
+    "vscode": "^1.90.0"
+  },
   "main": "./out/extension.js",
-  "activationEvents": ["onStartupFinished"],
-  "extensionDependencies": ["anthropic.claude-code"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "extensionDependencies": [
+    "anthropic.claude-code"
+  ],
   "contributes": {
     "viewsContainers": {
-      "activitybar": [{"id": "commandCenter", "title": "Command Center", "icon": "media/icon.svg"}]
+      "activitybar": [
+        {
+          "id": "commandCenter",
+          "title": "Command Center",
+          "icon": "media/icon.svg"
+        }
+      ]
     },
     "views": {
-      "commandCenter": [{"id": "commandCenter.tickets", "name": "Tickets"}]
+      "commandCenter": [
+        {
+          "id": "commandCenter.tickets",
+          "name": "Tickets"
+        }
+      ]
     },
     "commands": [
-      {"command": "commandCenter.refresh", "title": "Refresh", "icon": "$(refresh)"},
-      {"command": "commandCenter.newConversation", "title": "New Claude Conversation", "icon": "$(add)"},
-      {"command": "commandCenter.openConversation", "title": "Open Conversation"},
-      {"command": "commandCenter.openInJira", "title": "Open in Jira", "icon": "$(link-external)"}
+      {
+        "command": "commandCenter.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "commandCenter.toggleTerminal",
+        "title": "Toggle Panel / Terminal",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "commandCenter.newConversation",
+        "title": "New Claude Conversation",
+        "icon": "$(add)"
+      },
+      {
+        "command": "commandCenter.openConversation",
+        "title": "Open Conversation"
+      },
+      {
+        "command": "commandCenter.openInJira",
+        "title": "Open in Jira",
+        "icon": "$(link-external)"
+      }
     ],
     "menus": {
-      "view/title": [{"command": "commandCenter.refresh", "when": "view == commandCenter.tickets", "group": "navigation"}],
+      "view/title": [
+        {
+          "command": "commandCenter.toggleTerminal",
+          "when": "view == commandCenter.tickets",
+          "group": "navigation"
+        },
+        {
+          "command": "commandCenter.refresh",
+          "when": "view == commandCenter.tickets",
+          "group": "navigation"
+        }
+      ],
       "view/item/context": [
-        {"command": "commandCenter.newConversation", "when": "view == commandCenter.tickets && viewItem == ticket", "group": "inline"},
-        {"command": "commandCenter.openInJira", "when": "view == commandCenter.tickets && viewItem == ticket", "group": "inline"}
+        {
+          "command": "commandCenter.newConversation",
+          "when": "view == commandCenter.tickets && viewItem == ticket",
+          "group": "inline"
+        },
+        {
+          "command": "commandCenter.openInJira",
+          "when": "view == commandCenter.tickets && viewItem == ticket",
+          "group": "inline"
+        }
       ],
       "commandPalette": [
-        {"command": "commandCenter.newConversation", "when": "false"},
-        {"command": "commandCenter.openConversation", "when": "false"},
-        {"command": "commandCenter.openInJira", "when": "false"}
+        {
+          "command": "commandCenter.newConversation",
+          "when": "false"
+        },
+        {
+          "command": "commandCenter.openConversation",
+          "when": "false"
+        },
+        {
+          "command": "commandCenter.openInJira",
+          "when": "false"
+        }
       ]
     },
     "configuration": {
@@ -51,14 +116,35 @@
           "type": "array",
           "items": {
             "type": "object",
-            "properties": {"name": {"type": "string"}, "jql": {"type": "string"}},
-            "required": ["name", "jql"]
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "jql": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "jql"
+            ]
           },
           "default": [
-            {"name": "My sprint", "jql": "assignee = currentUser() AND sprint in openSprints() ORDER BY Rank"},
-            {"name": "My open tickets", "jql": "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"}
+            {
+              "name": "My sprint",
+              "jql": "assignee = currentUser() AND sprint in openSprints() ORDER BY Rank"
+            },
+            {
+              "name": "My open tickets",
+              "jql": "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
+            }
           ],
           "description": "Ticket groups shown in the tree."
+        },
+        "commandCenter.useTerminal": {
+          "type": "boolean",
+          "default": false,
+          "description": "Open Claude conversations in the terminal (Claude Code CLI) instead of the Claude Code panel."
         }
       }
     }

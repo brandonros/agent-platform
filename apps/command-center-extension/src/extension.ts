@@ -127,6 +127,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("commandCenter.refresh", () => tree.refresh()),
     vscode.commands.registerCommand("commandCenter.openConversation", (node: ConversationNode) => {
       const c = node.conversation;
+      if (useTerminal()) return claudeInTerminal(c.title || c.sessionId.slice(0, 8), `--resume ${c.sessionId}`);
       if (!c.headless) return vscode.commands.executeCommand(OPEN, c.sessionId);
       vscode.window.showWarningMessage(
         "This conversation was started with claude -p, which the Claude panel can't open. Run headless turns with CLAUDE_CODE_ENTRYPOINT=claude-vscode.",
@@ -147,9 +148,24 @@ export function activate(context: vscode.ExtensionContext): void {
         "",
         "Read the full ticket(s) in Jira (description, acceptance criteria, comments) and propose a plan before changing code.",
       ].join("\n");
+      if (useTerminal()) return claudeInTerminal(tickets.map((t) => t.key).join(", "), `'${prompt.replaceAll("'", `'\\''`)}'`);
       return vscode.commands.executeCommand(OPEN, undefined, prompt);
     }),
+    vscode.commands.registerCommand("commandCenter.toggleTerminal", async () => {
+      await settings().update("useTerminal", !useTerminal(), vscode.ConfigurationTarget.Global);
+      vscode.window.showInformationMessage(`Claude conversations open in the ${useTerminal() ? "terminal" : "panel"}.`);
+    }),
   );
+}
+
+function useTerminal(): boolean {
+  return settings().get("useTerminal", false);
+}
+
+function claudeInTerminal(name: string, args: string): void {
+  const terminal = vscode.window.createTerminal({name});
+  terminal.sendText(`claude ${args}`);
+  terminal.show();
 }
 
 export function deactivate(): void {}
