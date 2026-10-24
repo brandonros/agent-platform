@@ -33,7 +33,8 @@ configMaps:
                   "command": ["sh", "-c", "f=\"$HOME/.claude/projects/-home-coder-workspace/$SESSION_ID.jsonl\"; if [ -f \"$f\" ]; then flag=--resume; else flag=--session-id; fi; exec claude -p \"$PROMPT\" --output-format json --permission-mode bypassPermissions \"$flag\" \"$SESSION_ID\""],
                   "envFrom": [
                     {"secretRef": {"name": "jira", "optional": true}},
-                    {"secretRef": {"name": "git-identity", "optional": true}}
+                    {"secretRef": {"name": "git-identity", "optional": true}},
+                    {"secretRef": {"name": "github", "optional": true}}
                   ],
                   "env": [
                     {"name": "PROMPT", "value": ""},

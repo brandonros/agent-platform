@@ -21,7 +21,7 @@ init:
     umask 077
     limactl shell agent-platform sudo cat /etc/rancher/k3s/k3s.yaml > "$KUBECONFIG"
 
-# Store CLAUDE_CODE_OAUTH_TOKEN, Jira credentials and git identity when set, and, when ENTRA_* are set, oauth2-proxy credentials (keeping its cookie secret).
+# Store CLAUDE_CODE_OAUTH_TOKEN, Jira and GitHub credentials and git identity when set, and, when ENTRA_* are set, oauth2-proxy credentials (keeping its cookie secret).
 secrets:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -35,7 +35,6 @@ secrets:
         --from-file=JIRA_BASE_URL=<(printf %s "$JIRA_BASE_URL") \
         --from-file=JIRA_EMAIL=<(printf %s "$JIRA_EMAIL") \
         --from-file=JIRA_API_TOKEN=<(printf %s "$JIRA_API_TOKEN")
-      kubectl -n agent-platform rollout restart deployment/code-server 2>/dev/null || true
     else
       echo "Jira not configured (JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN); Command Center shows demo tickets." >&2
     fi
@@ -48,6 +47,13 @@ secrets:
     else
       echo "Git identity not configured (GIT_USER_NAME, GIT_USER_EMAIL); commits will fail until a repo sets one." >&2
     fi
+    if [ -n "${GH_TOKEN:-}" ]; then
+      secret github --from-file=GH_TOKEN=<(printf %s "$GH_TOKEN")
+    else
+      echo "GitHub not configured (GH_TOKEN); git push and gh will fail." >&2
+    fi
+    # Env from these Secrets is read at pod start.
+    kubectl -n agent-platform rollout restart deployment/code-server 2>/dev/null || true
     if [ -z "${ENTRA_TENANT_ID:-}" ] || [ -z "${ENTRA_CLIENT_ID:-}" ] || [ -z "${ENTRA_CLIENT_SECRET:-}" ]; then
       echo "Entra ID not configured (ENTRA_* unset); oauth2-proxy will not be deployed." >&2
       exit 0

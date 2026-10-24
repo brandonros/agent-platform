@@ -15,6 +15,8 @@ controllers:
           - secretRef: {name: jira, optional: true}
           # GIT_AUTHOR_* and GIT_COMMITTER_*: commit identity for every repo.
           - secretRef: {name: git-identity, optional: true}
+          # GH_TOKEN: git push and gh.
+          - secretRef: {name: github, optional: true}
         resources: {requests: {cpu: 250m, memory: 512Mi}, limits: {memory: 2Gi}}
 persistence:
   # Mount only workspace and ~/.claude so the CLI and extension installed in the
