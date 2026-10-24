@@ -264,16 +264,24 @@ export function activate(context: vscode.ExtensionContext): void {
       prs.refresh();
     }),
     // In the GitHub Pull Requests extension when it's installed, otherwise the browser.
-    vscode.commands.registerCommand("commandCenter.openPullRequest", (node: PrNode) => {
-      if (!vscode.extensions.getExtension(PR_EXTENSION)) return vscode.env.openExternal(vscode.Uri.parse(node.pr.url));
-      return vscode.env.openExternal(
-        vscode.Uri.from({
-          scheme: vscode.env.uriScheme,
-          authority: PR_EXTENSION,
-          path: "/open-pull-request-webview",
-          query: `uri=${encodeURIComponent(node.pr.url)}`,
-        }),
-      );
+    // Its URI handler can't be reached in code-server (openExternal leaves the page), so
+    // call pr.openDescription with the {pullRequestDetails} shape it accepts from chat.
+    vscode.commands.registerCommand("commandCenter.openPullRequest", async (node: PrNode) => {
+      const {pr} = node;
+      if (!vscode.extensions.getExtension(PR_EXTENSION)) return vscode.env.openExternal(vscode.Uri.parse(pr.url));
+      const [owner, name] = pr.repo.split("/");
+      try {
+        await vscode.commands.executeCommand("pr.openDescription", {
+          pullRequestDetails: {repository: {owner: {login: owner}, name}, number: pr.number},
+        });
+      } catch {
+        // It only knows repos cloned in the open folder.
+        const choice = await vscode.window.showInformationMessage(
+          `${pr.repo} isn't cloned in this workspace, so the Pull Requests extension can't open #${pr.number}.`,
+          "Open on GitHub",
+        );
+        if (choice) vscode.env.openExternal(vscode.Uri.parse(pr.url));
+      }
     }),
     vscode.commands.registerCommand("commandCenter.openPullRequestInBrowser", (node: PrNode) =>
       vscode.env.openExternal(vscode.Uri.parse(node.pr.url)),

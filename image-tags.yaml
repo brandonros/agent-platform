@@ -1,4 +1,4 @@
 # Image tags built by `just build-image` and deployed by helmfile. Bump after a rebuild.
 # code-server is built FROM claude-base:<claude-base tag>.
 claude-base: "5"
-code-server: "22"
+code-server: "23"
