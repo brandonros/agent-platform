@@ -21,7 +21,8 @@ export interface Conversation {
 
 interface HookEvent {
   ts: number;
-  event: "UserPromptSubmit" | "Stop" | "Notification";
+  // Deleted is written by remove(), not by a hook.
+  event: "UserPromptSubmit" | "Stop" | "Notification" | "Deleted";
   session_id: string;
   cwd?: string;
   entrypoint?: string;
@@ -30,11 +31,9 @@ interface HookEvent {
 
 const TAG = /\[([A-Z][A-Z0-9_]+-\d+)\]/g;
 
-export const logPath = path.join(
-  process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude"),
-  "command-center",
-  "events.jsonl",
-);
+const claudeDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
+
+export const logPath = path.join(claudeDir, "command-center", "events.jsonl");
 
 export function ticketTag(keys: string[]): string {
   return keys.map((k) => `[${k}]`).join("");
@@ -56,6 +55,10 @@ export function load(): Map<string, Conversation> {
       continue;
     }
     if (!e.session_id) continue;
+    if (e.event === "Deleted") {
+      conversations.delete(e.session_id);
+      continue;
+    }
     let c = conversations.get(e.session_id);
     if (!c) {
       c = {
@@ -82,4 +85,20 @@ export function load(): Map<string, Conversation> {
     }
   }
   return conversations;
+}
+
+// Deletes the conversation's transcript (projects/<cwd>/<id>.jsonl and its <id>/
+// folder) wherever it ran, and drops it from the tree.
+export function remove(sessionId: string): void {
+  const projects = path.join(claudeDir, "projects");
+  let dirs: string[] = [];
+  try {
+    dirs = fs.readdirSync(projects);
+  } catch {}
+  for (const dir of dirs) {
+    fs.rmSync(path.join(projects, dir, `${sessionId}.jsonl`), {force: true});
+    fs.rmSync(path.join(projects, dir, sessionId), {recursive: true, force: true});
+  }
+  fs.mkdirSync(path.dirname(logPath), {recursive: true});
+  fs.appendFileSync(logPath, JSON.stringify({ts: Date.now() / 1000, event: "Deleted", session_id: sessionId}) + "\n");
 }

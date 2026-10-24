@@ -57,6 +57,14 @@
         "command": "commandCenter.openInJira",
         "title": "Open in Jira",
         "icon": "$(link-external)"
+      },
+      {
+        "command": "commandCenter.deleteConversation",
+        "title": "Delete Conversation"
+      },
+      {
+        "command": "commandCenter.deleteWorkspace",
+        "title": "Delete Workspace Folder"
       }
     ],
     "menus": {
@@ -82,6 +90,16 @@
           "command": "commandCenter.openInJira",
           "when": "view == commandCenter.tickets && viewItem == ticket",
           "group": "inline"
+        },
+        {
+          "command": "commandCenter.deleteConversation",
+          "when": "view == commandCenter.tickets && viewItem == conversation",
+          "group": "9_delete"
+        },
+        {
+          "command": "commandCenter.deleteWorkspace",
+          "when": "view == commandCenter.tickets && viewItem == ticket",
+          "group": "9_delete"
         }
       ],
       "commandPalette": [
@@ -95,6 +113,14 @@
         },
         {
           "command": "commandCenter.openInJira",
+          "when": "false"
+        },
+        {
+          "command": "commandCenter.deleteConversation",
+          "when": "false"
+        },
+        {
+          "command": "commandCenter.deleteWorkspace",
           "when": "false"
         }
       ]

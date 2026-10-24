@@ -91,6 +91,7 @@ class Tree implements vscode.TreeDataProvider<Node> {
         item.description = `${label(c.status)}${c.headless ? " · headless" : ""} · ${age(c.updated)}`;
         item.tooltip = `${c.sessionId}\nTickets: ${[...c.tickets].join(", ")}`;
         item.iconPath = icon(c.status);
+        item.contextValue = "conversation";
         item.command = {command: "commandCenter.openConversation", title: "Open", arguments: [node]};
         return item;
       }
@@ -154,6 +155,43 @@ export function activate(context: vscode.ExtensionContext): void {
       ].join("\n");
       const keys = tickets.map((t) => t.key);
       return workspaces.inFolder(context, {folder: workspaces.ensure(keys), prompt, title: keys.join(", ")}, openClaude);
+    }),
+    vscode.commands.registerCommand("commandCenter.deleteConversation", async (node: ConversationNode) => {
+      const c = node.conversation;
+      const running = c.status === "running" ? " It is still running." : "";
+      const ok = await vscode.window.showWarningMessage(
+        `Delete conversation "${c.title || c.sessionId}"?${running}`,
+        {modal: true, detail: "Its history is deleted and can't be resumed. Files it changed are kept."},
+        "Delete",
+      );
+      if (ok !== "Delete") return;
+      conversations.remove(c.sessionId);
+      tree.reloadConversations();
+      updateBadge();
+    }),
+    vscode.commands.registerCommand("commandCenter.deleteWorkspace", async (node: TicketNode) => {
+      const folder = workspaces.folderFor(node.ticket.key);
+      if (!fs.existsSync(folder)) {
+        return vscode.window.showInformationMessage(`${node.ticket.key} has no workspace folder.`);
+      }
+      const open = workspaces.current();
+      if (open && (open === folder || open.startsWith(folder + "/"))) {
+        return vscode.window.showWarningMessage(`${folder} is open in this window. Switch to another folder before deleting it.`);
+      }
+      const unsaved = await workspaces.unsavedWork(folder);
+      const ok = await vscode.window.showWarningMessage(
+        `Delete ${folder}?`,
+        {
+          modal: true,
+          detail: unsaved.length
+            ? `These repos have work that isn't pushed and will be lost:\n${unsaved.join("\n")}`
+            : "Every repo in it is committed and pushed. Its conversations are kept.",
+        },
+        "Delete",
+      );
+      if (ok !== "Delete") return;
+      fs.rmSync(folder, {recursive: true, force: true});
+      vscode.window.showInformationMessage(`Deleted ${folder}.`);
     }),
     vscode.commands.registerCommand("commandCenter.toggleTerminal", async () => {
       await settings().update("useTerminal", !useTerminal(), vscode.ConfigurationTarget.Global);
