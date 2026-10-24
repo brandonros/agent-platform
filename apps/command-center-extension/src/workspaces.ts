@@ -49,5 +49,7 @@ export async function resume(context: vscode.ExtensionContext, open: (p: Pending
   const pending = context.globalState.get<Pending & {at: number}>(PENDING);
   if (!pending || current() !== path.resolve(pending.folder)) return;
   await context.globalState.update(PENDING, undefined);
+  // The reload resets the sidebar; bring the user back to the tree.
+  await vscode.commands.executeCommand("workbench.view.extension.commandCenter");
   if (Date.now() - pending.at < 60_000) open(pending);
 }
