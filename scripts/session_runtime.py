@@ -87,12 +87,12 @@ def template():
 
 
 def users():
-    """users.yaml: {id: {name, email}}; flat enough to parse without PyYAML."""
+    """users.yaml: {id: {name, email, github}}; flat enough to parse without PyYAML."""
     found, current = {}, None
     for line in USERS.read_text().splitlines():
         if m := re.match(r'^([A-Za-z0-9-]+):\s*$', line):
             current = found[m[1]] = {}
-        elif (m := re.match(r'^\s+(name|email):\s*(.+?)\s*$', line)) and current is not None:
+        elif (m := re.match(r'^\s+(name|email|github):\s*(.+?)\s*$', line)) and current is not None:
             current[m[1]] = m[2].strip('"\'')
     return found
 

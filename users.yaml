@@ -1,6 +1,8 @@
 # One browser IDE per user: helmfile release code-server-<id> with its own PVC.
 # To add a user, add them here and a matching release in helmfile.yaml.
 # email: git commits and the user's Jira account (${userEmail} in JQL presets).
+# github: the user's GitHub username (${githubUser} in pull request presets).
 brandon:
   name: Brandon Ros
   email: brandonros1@gmail.com
+  github: brandonros

@@ -21,6 +21,8 @@ controllers:
           GIT_COMMITTER_EMAIL: {{ $user.email | quote }}
           # Command Center: ${userEmail} in JQL presets.
           COMMAND_CENTER_USER_EMAIL: {{ $user.email | quote }}
+          # Command Center: ${githubUser} in pull request presets.
+          COMMAND_CENTER_GITHUB_USER: {{ $user.github | default "" | quote }}
         # Command Center: JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN. Demo tickets without it.
         envFrom:
           - secretRef: {name: jira, optional: true}

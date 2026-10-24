@@ -30,6 +30,10 @@
         {
           "id": "commandCenter.tickets",
           "name": "Tickets"
+        },
+        {
+          "id": "commandCenter.pullRequests",
+          "name": "Pull Requests"
         }
       ]
     },
@@ -65,6 +69,10 @@
       {
         "command": "commandCenter.deleteWorkspace",
         "title": "Delete Workspace Folder"
+      },
+      {
+        "command": "commandCenter.openPullRequest",
+        "title": "Open Pull Request"
       }
     ],
     "menus": {
@@ -77,6 +85,11 @@
         {
           "command": "commandCenter.refresh",
           "when": "view == commandCenter.tickets",
+          "group": "navigation"
+        },
+        {
+          "command": "commandCenter.refresh",
+          "when": "view == commandCenter.pullRequests",
           "group": "navigation"
         }
       ],
@@ -121,6 +134,10 @@
         },
         {
           "command": "commandCenter.deleteWorkspace",
+          "when": "false"
+        },
+        {
+          "command": "commandCenter.openPullRequest",
           "when": "false"
         }
       ]
@@ -172,6 +189,36 @@
           "type": "string",
           "default": "",
           "description": "Folder that holds one workspace folder per ticket (e.g. ~/Documents/coding). Defaults to ~/workspace."
+        },
+        "commandCenter.githubUser": {
+          "type": "string",
+          "default": "",
+          "description": "Your GitHub username; ${githubUser} in pull request presets becomes this, or @me when empty. Defaults to COMMAND_CENTER_GITHUB_USER."
+        },
+        "commandCenter.prPresets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "query": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "query"
+            ]
+          },
+          "default": [
+            {
+              "name": "My pull requests",
+              "query": "is:pr is:open author:${githubUser} sort:updated-desc"
+            }
+          ],
+          "description": "One Pull Requests group per entry: a name and the GitHub search query that backs it. Tickets show PRs from these that mention their key."
         }
       }
     }
