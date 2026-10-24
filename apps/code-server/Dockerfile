@@ -25,6 +25,10 @@ RUN code-server --install-extension anthropic.claude-code \
        '    "chat.disableAIFeatures": true,' \
        '    "claudeCode.preferredLocation": "panel",' \
        '    "workbench.startupEditor": "none"' \
-       '}' > /home/coder/.local/share/code-server/Machine/settings.json
+       '}' > /home/coder/.local/share/code-server/Machine/settings.json \
+    # The browser encrypts sign-ins (e.g. GitHub) with this server key half; keep it on
+    # the user's PVC so sign-ins survive redeploys. code-server creates it if missing.
+    && ln -s /home/coder/.local/share/code-server/User/serve-web-key-half \
+       /home/coder/.local/share/code-server/serve-web-key-half
 EXPOSE 8080
 ENTRYPOINT ["dumb-init", "code-server"]
