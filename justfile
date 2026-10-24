@@ -38,22 +38,13 @@ secrets:
     else
       echo "Jira not configured (JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN); Command Center shows demo tickets." >&2
     fi
-    if [ -n "${GIT_USER_NAME:-}" ] && [ -n "${GIT_USER_EMAIL:-}" ]; then
-      secret git-identity \
-        --from-file=GIT_AUTHOR_NAME=<(printf %s "$GIT_USER_NAME") \
-        --from-file=GIT_AUTHOR_EMAIL=<(printf %s "$GIT_USER_EMAIL") \
-        --from-file=GIT_COMMITTER_NAME=<(printf %s "$GIT_USER_NAME") \
-        --from-file=GIT_COMMITTER_EMAIL=<(printf %s "$GIT_USER_EMAIL")
-    else
-      echo "Git identity not configured (GIT_USER_NAME, GIT_USER_EMAIL); commits will fail until a repo sets one." >&2
-    fi
     if [ -n "${GH_TOKEN:-}" ]; then
       secret github --from-file=GH_TOKEN=<(printf %s "$GH_TOKEN")
     else
       echo "GitHub not configured (GH_TOKEN); git push and gh will fail." >&2
     fi
     # Env from these Secrets is read at pod start.
-    kubectl -n agent-platform rollout restart deployment/code-server 2>/dev/null || true
+    kubectl -n agent-platform rollout restart deployment -l app=code-server 2>/dev/null || true
     if [ -z "${ENTRA_TENANT_ID:-}" ] || [ -z "${ENTRA_CLIENT_ID:-}" ] || [ -z "${ENTRA_CLIENT_SECRET:-}" ]; then
       echo "Entra ID not configured (ENTRA_* unset); oauth2-proxy will not be deployed." >&2
       exit 0
@@ -105,15 +96,15 @@ claude-job prompt *args:
 claude-jobs:
     kubectl -n agent-platform get jobs -l app=claude-job -L claude-session -L claude-started-by
 
-# Open code-server at http://localhost:8080 (localhost is a secure context): through Entra ID
-# sign-in when oauth2-proxy is deployed, otherwise directly.
-code-server:
+# Open a user's code-server (users.yaml) at http://localhost:<port> (localhost is a secure
+# context): through Entra ID sign-in when oauth2-proxy is deployed, otherwise directly.
+code-server user port="8080":
     #!/usr/bin/env bash
-    if kubectl -n agent-platform get svc oauth2-proxy >/dev/null 2>&1; then target=svc/oauth2-proxy:4180; else target=svc/code-server:8080; fi
-    echo "Forwarding http://localhost:8080 -> ${target%:*}"
-    while true; do kubectl -n agent-platform port-forward "${target%:*}" "8080:${target##*:}"; sleep 1; done
+    if kubectl -n agent-platform get svc oauth2-proxy >/dev/null 2>&1; then target=svc/oauth2-proxy:4180; else target="svc/code-server-$1:8080"; fi
+    echo "Forwarding http://localhost:$2 -> ${target%:*}"
+    while true; do kubectl -n agent-platform port-forward "${target%:*}" "$2:${target##*:}"; sleep 1; done
 
-logs app="code-server":
+logs app:
     kubectl -n agent-platform logs -f "deployment/$1"
 
 # Remove Helm releases; volumes and the Secret remain.

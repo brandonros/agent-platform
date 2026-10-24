@@ -25,7 +25,8 @@ export async function search(config: JiraConfig, jql: string): Promise<Ticket[]>
   if (!base) {
     return DEMO.map((t) => ({...t, url: `https://jira.example.com/browse/${t.key}`}));
   }
-  jql = jql.replaceAll("${userEmail}", config.userEmail);
+  // ${userEmail} is the IDE's user, so a shared service-account token still sees "my" tickets.
+  jql = jql.replaceAll("${userEmail}", config.userEmail ? JSON.stringify(config.userEmail) : "currentUser()");
   const fields = ["summary", "status"];
   const cloud = base.includes(".atlassian.net");
   const res = cloud

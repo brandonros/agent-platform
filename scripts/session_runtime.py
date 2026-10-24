@@ -1,8 +1,12 @@
 """Shared Kubernetes/session operations. Locks fail closed after uncertain creates."""
 import copy
 import json
+import pathlib
+import re
 import subprocess
 import uuid
+
+USERS = pathlib.Path(__file__).resolve().parent.parent / 'users.yaml'
 
 
 class Error(RuntimeError):
@@ -82,6 +86,37 @@ def template():
     return json.loads(config['data']['job.json']), config['data']['ide-image']
 
 
+def users():
+    """users.yaml: {id: {name, email}}; flat enough to parse without PyYAML."""
+    found, current = {}, None
+    for line in USERS.read_text().splitlines():
+        if m := re.match(r'^([A-Za-z0-9-]+):\s*$', line):
+            current = found[m[1]] = {}
+        elif (m := re.match(r'^\s+(name|email):\s*(.+?)\s*$', line)) and current is not None:
+            current[m[1]] = m[2].strip('"\'')
+    return found
+
+
+def default_user():
+    ids = list(users())
+    return ids[0] if len(ids) == 1 else None
+
+
+def for_user(spec, user):
+    """Run on the user's PVC and node, committing as the user."""
+    profile = users().get(user)
+    if not profile:
+        raise Error(f'Unknown user {user!r}; add them to users.yaml')
+    term = spec['affinity']['podAffinity']['requiredDuringSchedulingIgnoredDuringExecution'][0]
+    term['labelSelector']['matchLabels']['code-server-user'] = user
+    for volume in spec['volumes']:
+        if volume['name'] == 'workspace':
+            volume['persistentVolumeClaim']['claimName'] = f'code-server-{user}'
+    spec['containers'][0]['env'] += [
+        {'name': f'GIT_{role}_{field.upper()}', 'value': profile[field]}
+        for role in ('AUTHOR', 'COMMITTER') for field in ('name', 'email')]
+
+
 def isolate(spec, session):
     """Mount only this session into the main container; setup sees the PVC root."""
     container = spec['containers'][0]
@@ -115,7 +150,8 @@ def ide_pod(job, image, session, proxy=None):
                      command=['dumb-init', 'code-server'],
                      args=['--bind-addr', '0.0.0.0:8080', '--auth', 'none', '/home/coder/workspace'],
                      resources={'requests': {'cpu': '250m', 'memory': '512Mi'}, 'limits': {'memory': '2Gi'}})
-    container['env'] = [e for e in container['env'] if e['name'] == 'CLAUDE_CODE_OAUTH_TOKEN']
+    container['env'] = [e for e in container['env']
+                        if e['name'] == 'CLAUDE_CODE_OAUTH_TOKEN' or e['name'].startswith('GIT_')]
     container['ports'] = [{'containerPort': 8080}]
     if proxy:
         sidecar = copy.deepcopy(proxy['spec']['template']['spec']['containers'][0])

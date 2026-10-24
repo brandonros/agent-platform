@@ -136,7 +136,7 @@
         "commandCenter.userEmail": {
           "type": "string",
           "default": "",
-          "description": "Replaces ${userEmail} in JQL presets (for service-account tokens, where currentUser() is the bot). Defaults to COMMAND_CENTER_USER_EMAIL."
+          "description": "Your Jira email; ${userEmail} in JQL presets becomes this (quoted), or currentUser() when empty. Defaults to COMMAND_CENTER_USER_EMAIL."
         },
         "commandCenter.jqlPresets": {
           "type": "array",
@@ -158,7 +158,7 @@
           "default": [
             {
               "name": "My tickets",
-              "jql": "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
+              "jql": "assignee = ${userEmail} AND statusCategory != Done ORDER BY updated DESC"
             }
           ],
           "description": "One tree group per entry: a name and the JQL that backs it."

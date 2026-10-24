@@ -1,6 +1,6 @@
 {{- $image := printf "claude-base:%s" (index (readFile "../image-tags.yaml" | fromYaml) "claude-base") -}}
-# Job template for one turn. The dispatcher injects session-specific mounts. Dispatchers read
-# it from the cluster and set metadata.name, labels, PROMPT, and SESSION_ID.
+# Job template for one turn. Dispatchers read it from the cluster and set metadata.name,
+# labels, PROMPT, SESSION_ID, session-specific mounts, and the user's PVC, node, and git identity.
 configMaps:
   template:
     forceRename: claude-job-template
@@ -22,7 +22,7 @@ configMaps:
                 "automountServiceAccountToken": false,
                 "securityContext": {"runAsUser": 1000, "runAsGroup": 1000, "fsGroup": 1000},
                 "affinity": {"podAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": [{
-                  "labelSelector": {"matchLabels": {"app.kubernetes.io/instance": "code-server", "app.kubernetes.io/controller": "main"}},
+                  "labelSelector": {"matchLabels": {"app": "code-server", "code-server-user": ""}},
                   "topologyKey": "kubernetes.io/hostname"
                 }]}},
                 "containers": [{
@@ -33,7 +33,6 @@ configMaps:
                   "command": ["sh", "-c", "f=\"$HOME/.claude/projects/-home-coder-workspace/$SESSION_ID.jsonl\"; if [ -f \"$f\" ]; then flag=--resume; else flag=--session-id; fi; exec claude -p \"$PROMPT\" --output-format json --permission-mode bypassPermissions \"$flag\" \"$SESSION_ID\""],
                   "envFrom": [
                     {"secretRef": {"name": "jira", "optional": true}},
-                    {"secretRef": {"name": "git-identity", "optional": true}},
                     {"secretRef": {"name": "github", "optional": true}}
                   ],
                   "env": [
@@ -48,7 +47,7 @@ configMaps:
                     {"name": "workspace", "mountPath": "/home/coder/.claude", "subPath": "claude"}
                   ]
                 }],
-                "volumes": [{"name": "workspace", "persistentVolumeClaim": {"claimName": "code-server"}}]
+                "volumes": [{"name": "workspace", "persistentVolumeClaim": {"claimName": ""}}]
               }
             }
           }
