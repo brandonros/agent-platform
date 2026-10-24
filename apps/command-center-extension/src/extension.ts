@@ -21,6 +21,7 @@ type PrNode = {kind: "pr"; parent: string; pr: github.PullRequest};
 type Node = Preset | TicketNode | ConversationNode | ErrorNode | PrPresetNode | RepoNode | PrNode;
 
 const OPEN = "claude-vscode.primaryEditor.open";
+const PR_EXTENSION = "github.vscode-pull-request-github";
 
 // Pull requests per search preset, shared by both trees. Tickets show the PRs
 // found by any preset that mention their key.
@@ -262,7 +263,19 @@ export function activate(context: vscode.ExtensionContext): void {
       tree.refresh();
       prs.refresh();
     }),
-    vscode.commands.registerCommand("commandCenter.openPullRequest", (node: PrNode) =>
+    // In the GitHub Pull Requests extension when it's installed, otherwise the browser.
+    vscode.commands.registerCommand("commandCenter.openPullRequest", (node: PrNode) => {
+      if (!vscode.extensions.getExtension(PR_EXTENSION)) return vscode.env.openExternal(vscode.Uri.parse(node.pr.url));
+      return vscode.env.openExternal(
+        vscode.Uri.from({
+          scheme: vscode.env.uriScheme,
+          authority: PR_EXTENSION,
+          path: "/open-pull-request-webview",
+          query: `uri=${encodeURIComponent(node.pr.url)}`,
+        }),
+      );
+    }),
+    vscode.commands.registerCommand("commandCenter.openPullRequestInBrowser", (node: PrNode) =>
       vscode.env.openExternal(vscode.Uri.parse(node.pr.url)),
     ),
     vscode.commands.registerCommand("commandCenter.openConversation", (node: ConversationNode) => {

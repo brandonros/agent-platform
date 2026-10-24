@@ -18,6 +18,7 @@ COPY --from=command-center /src/command-center.vsix /tmp/command-center.vsix
 # Hide VS Code's own chat/AI UI by default.
 RUN code-server --install-extension anthropic.claude-code \
     && code-server --install-extension /tmp/command-center.vsix \
+    && code-server --install-extension GitHub.vscode-pull-request-github \
     && mkdir -p /home/coder/.local/share/code-server/User \
     && printf '%s\n' '{' \
        '    "chat.disableAIFeatures": true,' \

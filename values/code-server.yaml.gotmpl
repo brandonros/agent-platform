@@ -26,7 +26,7 @@ controllers:
         # Command Center: JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN. Demo tickets without it.
         envFrom:
           - secretRef: {name: jira, optional: true}
-          # GH_TOKEN: git push and gh.
+          # GH_TOKEN: git push and gh. GITHUB_TOKEN: code-server's GitHub sign-in (Pull Requests extension).
           - secretRef: {name: github, optional: true}
         resources: {requests: {cpu: 250m, memory: 512Mi}, limits: {memory: 2Gi}}
 persistence:

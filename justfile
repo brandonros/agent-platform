@@ -39,7 +39,8 @@ secrets:
       echo "Jira not configured (JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN); Command Center shows demo tickets." >&2
     fi
     if [ -n "${GH_TOKEN:-}" ]; then
-      secret github --from-file=GH_TOKEN=<(printf %s "$GH_TOKEN")
+      # GITHUB_TOKEN signs code-server's GitHub extensions in (--github-auth).
+      secret github --from-file=GH_TOKEN=<(printf %s "$GH_TOKEN") --from-file=GITHUB_TOKEN=<(printf %s "$GH_TOKEN")
     else
       echo "GitHub not configured (GH_TOKEN); git push and gh will fail." >&2
     fi

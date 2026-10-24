@@ -73,6 +73,11 @@
       {
         "command": "commandCenter.openPullRequest",
         "title": "Open Pull Request"
+      },
+      {
+        "command": "commandCenter.openPullRequestInBrowser",
+        "title": "Open on GitHub",
+        "icon": "$(link-external)"
       }
     ],
     "menus": {
@@ -113,6 +118,11 @@
           "command": "commandCenter.deleteWorkspace",
           "when": "view == commandCenter.tickets && viewItem == ticket",
           "group": "9_delete"
+        },
+        {
+          "command": "commandCenter.openPullRequestInBrowser",
+          "when": "viewItem == pr",
+          "group": "inline"
         }
       ],
       "commandPalette": [
@@ -138,6 +148,10 @@
         },
         {
           "command": "commandCenter.openPullRequest",
+          "when": "false"
+        },
+        {
+          "command": "commandCenter.openPullRequestInBrowser",
           "when": "false"
         }
       ]
