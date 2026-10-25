@@ -1,4 +1,6 @@
 # code-server and the Claude Code extension on top of claude-base.
+# BASE_IMAGE defaults to the local image; CI points it at GHCR.
+ARG BASE_IMAGE=claude-base
 ARG BASE_TAG
 # Command Center extension (apps/command-center-extension), packaged as a .vsix.
 FROM node:22-bookworm-slim AS command-center
@@ -8,7 +10,7 @@ RUN npm ci --no-audit --no-fund --ignore-scripts
 COPY apps/command-center-extension/ ./
 RUN npm run package
 
-FROM claude-base:${BASE_TAG}
+FROM ${BASE_IMAGE}:${BASE_TAG}
 USER root
 # Remove the built-in Copilot Chat extension; Claude Code is the only assistant.
 RUN curl -fsSL https://code-server.dev/install.sh | sh -s -- --version 4.141.0 \

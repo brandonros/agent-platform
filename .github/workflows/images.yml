@@ -1,0 +1,52 @@
+# Build both images for amd64 and arm64 (emulated) and push them to GHCR, tagged
+# from image-tags.yaml. code-server is built FROM the claude-base image pushed here.
+name: images
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: images
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read tags
+        id: tags
+        run: |
+          echo "base=$(awk -F'"' '/^claude-base:/ {print $2}' image-tags.yaml)" >> "$GITHUB_OUTPUT"
+          echo "cs=$(awk -F'"' '/^code-server:/ {print $2}' image-tags.yaml)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/claude-base/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/brandonros/agent-platform/claude-base:${{ steps.tags.outputs.base }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/code-server/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            BASE_IMAGE=ghcr.io/brandonros/agent-platform/claude-base
+            BASE_TAG=${{ steps.tags.outputs.base }}
+          tags: ghcr.io/brandonros/agent-platform/code-server:${{ steps.tags.outputs.cs }}
