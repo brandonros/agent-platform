@@ -1,0 +1,250 @@
+{
+  "name": "command-center",
+  "displayName": "Command Center",
+  "description": "Jira tickets linked to Claude Code conversations",
+  "version": "0.1.0",
+  "publisher": "org",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "extensionDependencies": [
+    "anthropic.claude-code"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "commandCenter",
+          "title": "Command Center",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "commandCenter": [
+        {
+          "id": "commandCenter.tickets",
+          "name": "Tickets"
+        },
+        {
+          "id": "commandCenter.pullRequests",
+          "name": "Pull Requests"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "commandCenter.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "commandCenter.toggleTerminal",
+        "title": "Toggle Panel / Terminal",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "commandCenter.newConversation",
+        "title": "New Claude Conversation",
+        "icon": "$(add)"
+      },
+      {
+        "command": "commandCenter.openConversation",
+        "title": "Open Conversation"
+      },
+      {
+        "command": "commandCenter.openInJira",
+        "title": "Open in Jira",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "commandCenter.deleteConversation",
+        "title": "Delete Conversation"
+      },
+      {
+        "command": "commandCenter.deleteWorkspace",
+        "title": "Delete Workspace Folder"
+      },
+      {
+        "command": "commandCenter.openPullRequest",
+        "title": "Open Pull Request"
+      },
+      {
+        "command": "commandCenter.openPullRequestInBrowser",
+        "title": "Open on GitHub",
+        "icon": "$(link-external)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "commandCenter.toggleTerminal",
+          "when": "view == commandCenter.tickets",
+          "group": "navigation"
+        },
+        {
+          "command": "commandCenter.refresh",
+          "when": "view == commandCenter.tickets",
+          "group": "navigation"
+        },
+        {
+          "command": "commandCenter.refresh",
+          "when": "view == commandCenter.pullRequests",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "commandCenter.newConversation",
+          "when": "view == commandCenter.tickets && viewItem == ticket",
+          "group": "inline"
+        },
+        {
+          "command": "commandCenter.openInJira",
+          "when": "view == commandCenter.tickets && viewItem == ticket",
+          "group": "inline"
+        },
+        {
+          "command": "commandCenter.deleteConversation",
+          "when": "view == commandCenter.tickets && viewItem == conversation",
+          "group": "9_delete"
+        },
+        {
+          "command": "commandCenter.deleteWorkspace",
+          "when": "view == commandCenter.tickets && viewItem == ticket",
+          "group": "9_delete"
+        },
+        {
+          "command": "commandCenter.openPullRequestInBrowser",
+          "when": "viewItem == pr",
+          "group": "inline"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "commandCenter.newConversation",
+          "when": "false"
+        },
+        {
+          "command": "commandCenter.openConversation",
+          "when": "false"
+        },
+        {
+          "command": "commandCenter.openInJira",
+          "when": "false"
+        },
+        {
+          "command": "commandCenter.deleteConversation",
+          "when": "false"
+        },
+        {
+          "command": "commandCenter.deleteWorkspace",
+          "when": "false"
+        },
+        {
+          "command": "commandCenter.openPullRequest",
+          "when": "false"
+        },
+        {
+          "command": "commandCenter.openPullRequestInBrowser",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Command Center",
+      "properties": {
+        "commandCenter.jira.baseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Jira base URL, e.g. https://example.atlassian.net. Defaults to JIRA_BASE_URL; empty shows demo tickets. Credentials come from JIRA_EMAIL + JIRA_API_TOKEN (Cloud) or JIRA_PAT (Data Center)."
+        },
+        "commandCenter.userEmail": {
+          "type": "string",
+          "default": "",
+          "description": "Your Jira email; ${userEmail} in JQL presets becomes this (quoted), or currentUser() when empty. Defaults to COMMAND_CENTER_USER_EMAIL."
+        },
+        "commandCenter.jqlPresets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "jql": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "jql"
+            ]
+          },
+          "default": [
+            {
+              "name": "My tickets",
+              "jql": "assignee = ${userEmail} AND statusCategory != Done ORDER BY updated DESC"
+            }
+          ],
+          "description": "One tree group per entry: a name and the JQL that backs it."
+        },
+        "commandCenter.useTerminal": {
+          "type": "boolean",
+          "default": false,
+          "description": "Open Claude conversations in the terminal (Claude Code CLI) instead of the Claude Code panel."
+        },
+        "commandCenter.workspaceRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Folder that holds one workspace folder per ticket (e.g. ~/Documents/coding). Defaults to ~/workspace."
+        },
+        "commandCenter.githubUser": {
+          "type": "string",
+          "default": "",
+          "description": "Your GitHub username; ${githubUser} in pull request presets becomes this, or @me when empty. Defaults to COMMAND_CENTER_GITHUB_USER."
+        },
+        "commandCenter.prPresets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "query": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "query"
+            ]
+          },
+          "default": [
+            {
+              "name": "My pull requests",
+              "query": "is:pr is:open author:${githubUser} sort:updated-desc"
+            }
+          ],
+          "description": "One Pull Requests group per entry: a name and the GitHub search query that backs it. Tickets show PRs from these that mention their key."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "package": "tsc -p . && vsce package --no-dependencies --allow-missing-repository --skip-license -o command-center.vsix"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "1.90.0",
+    "@vscode/vsce": "^3.0.0",
+    "typescript": "^5.6.0"
+  }
+}

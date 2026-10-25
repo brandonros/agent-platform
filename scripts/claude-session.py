@@ -5,13 +5,14 @@ import subprocess
 import sys
 import uuid
 
-from session_runtime import Error, acquire, get, ide_pod, kubectl, lease_name, release, template, write
+from session_runtime import Error, acquire, default_user, for_user, get, ide_pod, kubectl, lease_name, release, template, write
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=('open', 'close'))
     parser.add_argument('session', type=uuid.UUID)
+    parser.add_argument('--user', default=default_user(), help="users.yaml id: the session's PVC")
     args = parser.parse_args()
     session = str(args.session)
     name = f'claude-ide-{session}'
@@ -34,7 +35,10 @@ def main():
         if not owned or owned['metadata'].get('annotations', {}).get('session-resource-name') != name:
             raise Error('IDE exists without its reservation; refusing to open it')
     else:
+        if not args.user:
+            raise Error('--user is required when users.yaml lists several users')
         job, image = template()
+        for_user(job['spec']['template']['spec'], args.user)
         proxy = get('deployment', 'oauth2-proxy')
         if get('secret', 'oauth2-proxy') and not proxy:
             raise Error('Entra is configured but its deployment is missing; run just apply')

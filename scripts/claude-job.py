@@ -8,7 +8,7 @@ import re
 import sys
 import uuid
 
-from session_runtime import Error, acquire, bind_job, get, isolate, kubectl, template, write
+from session_runtime import Error, acquire, bind_job, default_user, for_user, get, isolate, kubectl, template, write
 
 
 def main():
@@ -18,7 +18,10 @@ def main():
     parser.add_argument('--turn-id', help='deduplicates only while the Job exists')
     parser.add_argument('--started-by', default=getpass.getuser())
     parser.add_argument('--wait', action='store_true')
+    parser.add_argument('--user', default=default_user(), help="users.yaml id: the session's PVC and git identity")
     args = parser.parse_args()
+    if not args.user:
+        raise Error('--user is required when users.yaml lists several users')
     session = str(args.session or uuid.uuid4())
     name = 'claude-' + hashlib.sha256((args.turn_id or str(uuid.uuid4())).encode()).hexdigest()[:16]
     existing = get('job', name)
@@ -34,6 +37,7 @@ def main():
         for metadata in (job['metadata'], job['spec']['template']['metadata']):
             metadata['labels'].update({'claude-session': session, 'claude-started-by': started_by})
         spec = job['spec']['template']['spec']
+        for_user(spec, args.user)
         isolate(spec, session)
         for env in spec['containers'][0]['env']:
             if env['name'] in ('PROMPT', 'SESSION_ID'):

@@ -1,8 +1,13 @@
 {{- $tag := index (readFile "../image-tags.yaml" | fromYaml) "code-server" -}}
+{{- $id := trimPrefix "code-server-" .Release.Name -}}
+{{- $user := index (readFile "../users.yaml" | fromYaml) $id -}}
+# One release per user in users.yaml: code-server-<id>.
 defaultPodOptions:
   securityContext: {runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000}
+  labels: {app: code-server, code-server-user: {{ $id | quote }}}
 controllers:
   main:
+    labels: {app: code-server}
     containers:
       app:
         image: {repository: code-server, tag: {{ $tag | quote }}, pullPolicy: IfNotPresent}
@@ -10,10 +15,24 @@ controllers:
         args: ["--bind-addr", "0.0.0.0:8080", "--auth", "none", "/home/coder/workspace"]
         env:
           CLAUDE_CODE_OAUTH_TOKEN: {valueFrom: {secretKeyRef: {name: claude-secrets, key: oauth-token}}}
+          GIT_AUTHOR_NAME: {{ $user.name | quote }}
+          GIT_AUTHOR_EMAIL: {{ $user.email | quote }}
+          GIT_COMMITTER_NAME: {{ $user.name | quote }}
+          GIT_COMMITTER_EMAIL: {{ $user.email | quote }}
+          # Command Center: ${userEmail} in JQL presets.
+          COMMAND_CENTER_USER_EMAIL: {{ $user.email | quote }}
+          # Command Center: ${githubUser} in pull request presets.
+          COMMAND_CENTER_GITHUB_USER: {{ $user.github | default "" | quote }}
+        # Command Center: JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN. Demo tickets without it.
+        envFrom:
+          - secretRef: {name: jira, optional: true}
+          # GH_TOKEN: git push and gh. GITHUB_TOKEN: code-server's GitHub sign-in (Pull Requests extension).
+          - secretRef: {name: github, optional: true}
         resources: {requests: {cpu: 250m, memory: 512Mi}, limits: {memory: 2Gi}}
 persistence:
-  # Mount only workspace and ~/.claude so the CLI and extension installed in the
-  # image under /home/coder stay visible.
+  # The user's PVC: workspace (ticket folders), ~/.claude, and editor settings and
+  # state, plus sessions/<uuid>/ for Jobs. Mount only those so the CLI and
+  # extensions installed under /home/coder stay visible.
   home:
     type: persistentVolumeClaim
     accessMode: ReadWriteOnce
@@ -21,6 +40,7 @@ persistence:
     globalMounts:
       - {path: /home/coder/workspace, subPath: workspace}
       - {path: /home/coder/.claude, subPath: claude}
+      - {path: /home/coder/.local/share/code-server/User, subPath: code-server-user}
 service:
   main:
     controller: main

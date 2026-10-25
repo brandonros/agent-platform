@@ -1,8 +1,10 @@
 # Claude Code plus org-wide configuration. Jobs run this image directly;
 # code-server builds on it.
 FROM debian:trixie-slim
-RUN apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates python3 dumb-init \
+RUN apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates python3 dumb-init gh \
     && rm -rf /var/lib/apt/lists/*
+# git push/pull to GitHub authenticate with GH_TOKEN through gh.
+RUN git config --system credential.https://github.com.helper '!gh auth git-credential'
 # Same user and home as code-server, so session folders match (-home-coder-workspace).
 RUN useradd --uid 1000 --create-home --shell /bin/bash coder
 # Org-wide Claude Code config, outside ~/.claude: managed settings enable the

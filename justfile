@@ -21,7 +21,7 @@ init:
     umask 077
     limactl shell agent-platform sudo cat /etc/rancher/k3s/k3s.yaml > "$KUBECONFIG"
 
-# Store CLAUDE_CODE_OAUTH_TOKEN and, when ENTRA_* are set, oauth2-proxy credentials (keeping its cookie secret).
+# Store CLAUDE_CODE_OAUTH_TOKEN, Jira and GitHub credentials and git identity when set, and, when ENTRA_* are set, oauth2-proxy credentials (keeping its cookie secret).
 secrets:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -30,6 +30,22 @@ secrets:
     secret() { kubectl -n agent-platform create secret generic "$@" --dry-run=client -o yaml | kubectl apply --server-side --force-conflicts -f -; }
     kubectl create namespace agent-platform --dry-run=client -o yaml | kubectl apply -f -
     secret claude-secrets --from-file=oauth-token=<(printf %s "$CLAUDE_CODE_OAUTH_TOKEN")
+    if [ -n "${JIRA_BASE_URL:-}" ] && [ -n "${JIRA_EMAIL:-}" ] && [ -n "${JIRA_API_TOKEN:-}" ]; then
+      secret jira \
+        --from-file=JIRA_BASE_URL=<(printf %s "$JIRA_BASE_URL") \
+        --from-file=JIRA_EMAIL=<(printf %s "$JIRA_EMAIL") \
+        --from-file=JIRA_API_TOKEN=<(printf %s "$JIRA_API_TOKEN")
+    else
+      echo "Jira not configured (JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN); Command Center shows demo tickets." >&2
+    fi
+    if [ -n "${GH_TOKEN:-}" ]; then
+      # GITHUB_TOKEN signs code-server's GitHub extensions in (--github-auth).
+      secret github --from-file=GH_TOKEN=<(printf %s "$GH_TOKEN") --from-file=GITHUB_TOKEN=<(printf %s "$GH_TOKEN")
+    else
+      echo "GitHub not configured (GH_TOKEN); git push and gh will fail." >&2
+    fi
+    # Env from these Secrets is read at pod start.
+    kubectl -n agent-platform rollout restart deployment -l app=code-server 2>/dev/null || true
     if [ -z "${ENTRA_TENANT_ID:-}" ] || [ -z "${ENTRA_CLIENT_ID:-}" ] || [ -z "${ENTRA_CLIENT_SECRET:-}" ]; then
       echo "Entra ID not configured (ENTRA_* unset); oauth2-proxy will not be deployed." >&2
       exit 0
@@ -48,7 +64,7 @@ build-image component:
     set -euo pipefail
     tag() { awk -F'"' "/^$1:/ {print \$2}" image-tags.yaml; }
     image="$1:$(tag "$1")"
-    COPYFILE_DISABLE=1 tar --no-xattrs --exclude=__pycache__ -cz apps agents skills |
+    COPYFILE_DISABLE=1 tar --no-xattrs --exclude=__pycache__ --exclude=node_modules --exclude=out --exclude="*.vsix" -cz apps agents skills |
       limactl shell --workdir / agent-platform sudo docker build -t "$image" \
         --build-arg "BASE_TAG=$(tag claude-base)" -f "apps/$1/Dockerfile" -
     limactl shell --workdir / agent-platform sh -c "sudo docker save $image | sudo k3s ctr images import -"
@@ -81,15 +97,15 @@ claude-job prompt *args:
 claude-jobs:
     kubectl -n agent-platform get jobs -l app=claude-job -L claude-session -L claude-started-by
 
-# Open code-server at http://localhost:8080 (localhost is a secure context): through Entra ID
-# sign-in when oauth2-proxy is deployed, otherwise directly.
-code-server:
+# Open a user's code-server (users.yaml) at http://localhost:<port> (localhost is a secure
+# context): through Entra ID sign-in when oauth2-proxy is deployed, otherwise directly.
+code-server user port="8080":
     #!/usr/bin/env bash
-    if kubectl -n agent-platform get svc oauth2-proxy >/dev/null 2>&1; then target=svc/oauth2-proxy:4180; else target=svc/code-server:8080; fi
-    echo "Forwarding http://localhost:8080 -> ${target%:*}"
-    while true; do kubectl -n agent-platform port-forward "${target%:*}" "8080:${target##*:}"; sleep 1; done
+    if kubectl -n agent-platform get svc oauth2-proxy >/dev/null 2>&1; then target=svc/oauth2-proxy:4180; else target="svc/code-server-$1:8080"; fi
+    echo "Forwarding http://localhost:$2 -> ${target%:*}"
+    while true; do kubectl -n agent-platform port-forward "${target%:*}" "$2:${target##*:}"; sleep 1; done
 
-logs app="code-server":
+logs app:
     kubectl -n agent-platform logs -f "deployment/$1"
 
 # Remove Helm releases; volumes and the Secret remain.

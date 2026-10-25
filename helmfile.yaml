@@ -12,7 +12,8 @@ helmDefaults:
   atomic: false
 
 releases:
-  - name: code-server
+  # One browser IDE per user in users.yaml (values read the user from the release name).
+  - name: code-server-brandon
     namespace: agent-platform
     chart: bjw-s-labs/app-template
     version: 5.1.0
@@ -26,18 +27,14 @@ releases:
     version: 5.1.0
     values:
       - values/oauth2-proxy.yaml.gotmpl
-    needs:
-      - agent-platform/code-server
 
-  # Job template for Claude Code turns; session directories share the existing PVC.
+  # Job template for Claude Code turns; the dispatcher points it at a user's PVC.
   - name: claude-job
     namespace: agent-platform
     chart: bjw-s-labs/app-template
     version: 5.1.0
     values:
       - values/claude-job.yaml.gotmpl
-    needs:
-      - agent-platform/code-server
 
   - name: mcp-test-server
     namespace: agent-platform

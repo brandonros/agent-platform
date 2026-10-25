@@ -1,3 +1,4 @@
+{{- $first := keys (readFile "../users.yaml" | fromYaml) | sortAlpha | first -}}
 # Microsoft Entra ID sign-in in front of code-server (which runs with --auth none).
 # Credentials come from the oauth2-proxy Secret created by `just secrets`.
 defaultPodOptions:
@@ -17,9 +18,10 @@ controllers:
           OAUTH2_PROXY_SCOPE: openid email profile
           # Single-tenant app: any account in the tenant may sign in.
           OAUTH2_PROXY_EMAIL_DOMAINS: "*"
-          OAUTH2_PROXY_UPSTREAMS: http://code-server.agent-platform.svc.cluster.local:8080
+          # One proxy fronts one IDE: the first user in users.yaml. Per-user sign-in needs a proxy per user.
+          OAUTH2_PROXY_UPSTREAMS: http://code-server-{{ $first }}.agent-platform.svc.cluster.local:8080
           OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
-          # Reached through `just code-server` (port-forward to localhost:8080), so plain-HTTP cookies.
+          # Reached through `just code-server <user>` (port-forward to localhost:8080), so plain-HTTP cookies.
           OAUTH2_PROXY_REDIRECT_URL: http://localhost:8080/oauth2/callback
           OAUTH2_PROXY_COOKIE_SECURE: "false"
           OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
